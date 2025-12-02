@@ -66,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: Colors.green,
         ),
       );
+      Navigator.pushNamed(context, '/home');
     }
   }
 
