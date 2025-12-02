@@ -1,27 +1,26 @@
+// features/auth/screens/forgot_password_screen.dart
+
 import 'package:flutter/material.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isPasswordVisible = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -33,19 +32,22 @@ class _LoginScreenState extends State<LoginScreen> {
     // TODO: Hier wird später die Supabase-Integration implementiert
     // Beispiel:
     // try {
-    //   await supabase.auth.signInWithPassword(
-    //     email: _emailController.text,
-    //     password: _passwordController.text,
-    //   );
-    //   // Navigation zur Home-Seite nach erfolgreichem Login
+    //   await supabase.auth.resetPasswordForEmail(_emailController.text);
     //   if (mounted) {
-    //     Navigator.pushReplacementNamed(context, '/home');
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(
+    //         content: Text('Password reset link sent! Check your email.'),
+    //         backgroundColor: Colors.green,
+    //       ),
+    //     );
+    //     // Optional: Navigieren zur Login-Seite nach Erfolg
+    //     // Navigator.pop(context);
     //   }
     // } catch (e) {
     //   if (mounted) {
     //     ScaffoldMessenger.of(context).showSnackBar(
     //       SnackBar(
-    //         content: Text('Login failed: ${e.toString()}'),
+    //         content: Text('Error: ${e.toString()}'),
     //         backgroundColor: Colors.red,
     //       ),
     //     );
@@ -59,10 +61,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = false;
     });
 
+    // Dummy-Erfolgsnachricht
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
+        SnackBar(
+          content: Text(
+            'Password reset link sent to ${_emailController.text}!',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -72,9 +77,17 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // AppBar hinzugefügt für besseren Navigationskontext (Zurück-Button)
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      extendBodyBehindAppBar: true, // Lässt den Body hinter die AppBar laufen
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
+            // Stellen Sie sicher, dass 'assets/images/background.jpg' existiert oder ersetzen Sie es
             image: AssetImage('assets/images/background.jpg'),
             fit: BoxFit.cover,
           ),
@@ -91,6 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           child: SafeArea(
+            // Safe Area nur unter der AppBar, da diese transparent ist
+            top: false,
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
@@ -121,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Icon(
-                              Icons.school,
+                              Icons.lock_reset, // Passendes Icon
                               size: 40,
                               color: Colors.white,
                             ),
@@ -130,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Title
                           const Text(
-                            'Welcome Back',
+                            'Forgot Password?',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -139,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Sign in to continue your learning journey',
+                            'Enter your email address to receive a link to reset your password.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
@@ -169,67 +184,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
-                          // Password Field
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: !_isPasswordVisible,
-                            decoration: InputDecoration(
-                              labelText: 'Password *',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordVisible
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Forgot Password Link
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/forgot-password',
-                                );
-                              },
-                              child: const Text(
-                                'Forgot Password?',
-                                style: TextStyle(
-                                  color: Colors.blue,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Sign In Button
+                          // Reset Password Button
                           SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleLogin,
+                              onPressed: _isLoading
+                                  ? null
+                                  : _handleResetPassword,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue.shade600,
                                 foregroundColor: Colors.white,
@@ -247,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     )
                                   : const Text(
-                                      'Sign In',
+                                      'Reset Password',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -257,24 +221,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Create Account Link
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text('Don\'t have an account? '),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushNamed(context, '/register');
-                                },
-                                child: const Text(
-                                  'Create Account',
-                                  style: TextStyle(
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                          // Back to Login Link
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context); // Gehe zurück zum Login
+                            },
+                            child: const Text(
+                              'Back to Sign In',
+                              style: TextStyle(
+                                color: Colors.deepPurple,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),

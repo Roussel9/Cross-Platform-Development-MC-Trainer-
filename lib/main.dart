@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/forgot_password_screen.dart';
 import 'core/theme/app_theme.dart';
 
 void main() {
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/register': (context) => const RegisterScreen(),
         '/login': (context) => const LoginScreen(),
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
       },
     );
   }

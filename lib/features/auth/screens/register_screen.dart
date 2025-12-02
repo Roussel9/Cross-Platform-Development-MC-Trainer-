@@ -235,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             controller: _usernameController,
                             decoration: InputDecoration(
                               labelText: 'Username *',
-                              prefixIcon: const Icon(Icons.alternate_email),
+                              prefixIcon: const Icon(Icons.person_pin),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
