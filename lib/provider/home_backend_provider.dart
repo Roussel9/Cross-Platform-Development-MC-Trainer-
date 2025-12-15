@@ -7,38 +7,66 @@ import 'package:mc_trainer_kami/models/lernen_module.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Extension zur Großschreibung von Strings
+extension StringCasingExtension on String {
+  String capitalize() => '${this[0].toUpperCase()}${substring(1)}';
+}
+
 // --- Backend Provider ---
 class HomeBackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  String userName = 'John Doe';
-  int questionsThisWeek = 0;
-  int currentStreak = 0;
-  int modulesCompleted = 0;
+  String userName = 'John Doe';       // Vollständiger Name des Benutzers
+  String userInitials = 'JD';         // Initialen für Avatar
+  int questionsThisWeek = 0;          // Anzahl der Fragen diese Woche
+  int currentStreak = 0;              // Aktuelle Serie (Streak)
+  int modulesCompleted = 0;           // Anzahl abgeschlossener Module
 
-  List<LernenModule> lastModules = [];
-  Map<String, dynamic>? lastSession;
-  List<Map<String, dynamic>> achievements = [];
+  List<LernenModule> lastModules = [];           // Letzte Module
+  Map<String, dynamic>? lastSession;            // Letzte Session
+  List<Map<String, dynamic>> achievements = []; // Errungenschaften
 
-  bool isLoading = false;
-  String? error;
+  bool isLoading = false;           // Ladezustand
+  String? error;                    // Fehlernachricht
 
+  // Konstruktor lädt direkt die Home-Daten
   HomeBackendProvider() {
     fetchHomeData();
   }
 
+  // Berechnung des Fortschritts einer Session
   double calculateProgress(Map<String, dynamic>? session) {
     if (session == null) return 0.0;
     final total = session['total_questions'] ?? 1;
     final correct = session['correct_answered'] ?? 0;
     return (correct / total).clamp(0.0, 1.0);
   }
+
+  // --- Daten für Home Screen abrufen ---
   Future<void> fetchHomeData() async {
     isLoading = true;
     error = null;
     notifyListeners();
 
     try {
+      // --- Aktuellen Benutzer abrufen ---
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        final fullName = user.userMetadata?['full_name'] ??
+            user.email?.split('@').first.capitalize() ??
+            'Unknown User';
+        userName = fullName;
+
+        // Initialen aus dem Namen erzeugen (max. 2 Buchstaben)
+        userInitials = fullName
+            .split(' ')
+            .where((e) => e.isNotEmpty)
+            .map((e) => e[0])
+            .take(2)
+            .join()
+            .toUpperCase();
+      }
+
       // --- Letzte Session abrufen ---
       final sessions = await _supabase
           .from('learning_sessions')
@@ -46,12 +74,11 @@ class HomeBackendProvider with ChangeNotifier {
           .order('created_at', ascending: false)
           .limit(1) as List<dynamic>;
 
-      Map<String, dynamic>? lastSession;
       if (sessions.isNotEmpty) {
         lastSession = sessions.first as Map<String, dynamic>;
       }
 
-      // --- Letzte Module abrufen (3 Module) ---
+      // --- Letzte Module abrufen ---
       final modules = await _supabase
           .from('modules')
           .select('*')
@@ -61,17 +88,16 @@ class HomeBackendProvider with ChangeNotifier {
           .map((e) => LernenModule.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      // --- Statistik berechnen / setzen ---
+      // --- Statistiken setzen ---
       questionsThisWeek = lastSession?['total_questions'] ?? 0;
-      modulesCompleted = 5; // Beispielwert, ggf. aus Datenbank berechnen
-      currentStreak = 7;    // Beispielwert, ggf. aus Datenbank berechnen
+      modulesCompleted = 5; // TODO: aus Datenbank berechnen
+      currentStreak = 7;    // TODO: aus Datenbank berechnen
 
-      // --- Achievements setzen ---
+      // --- Errungenschaften setzen ---
       achievements = [
         {'title': 'First Step', 'earned': true},
         {'title': 'Quiz Master', 'earned': false},
       ];
-
     } catch (e) {
       error = 'Konnte Home-Daten nicht laden: $e';
       print(error);
@@ -80,13 +106,13 @@ class HomeBackendProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
 }
 
 // --- Home Screen ---
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  // --- StatCard Widget ---
   Widget _buildStatCard({
     required IconData icon,
     required String value,
@@ -165,6 +191,7 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // --- Begrüßung mit vollständigem Namen ---
                         Text('Welcome back, ${provider.userName}!',
                             style: const TextStyle(
                                 fontSize: 24,
