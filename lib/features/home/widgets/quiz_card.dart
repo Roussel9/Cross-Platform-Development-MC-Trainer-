@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mc_trainer/core/constants/app_colors.dart';
-import 'package:mc_trainer/widgets/custom_button.dart';
+import 'package:mc_trainer_kami/core/constants/app_colors.dart';
+import 'package:mc_trainer_kami/widgets/custom_button.dart';
 
 class QuizCard extends StatelessWidget {
   final String moduleTitle;
