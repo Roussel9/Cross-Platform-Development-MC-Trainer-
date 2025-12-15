@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +15,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
@@ -30,43 +34,99 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    // TODO: Hier wird später die Supabase-Integration implementiert
-    // Beispiel:
-    // try {
-    //   await supabase.auth.signInWithPassword(
-    //     email: _emailController.text,
-    //     password: _passwordController.text,
-    //   );
-    //   // Navigation zur Home-Seite nach erfolgreichem Login
-    //   if (mounted) {
-    //     Navigator.pushReplacementNamed(context, '/home');
-    //   }
-    // } catch (e) {
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(
-    //         content: Text('Login failed: ${e.toString()}'),
-    //         backgroundColor: Colors.red,
-    //       ),
-    //     );
-    //   }
-    // }
+    try {
+      // SUPABASE LOGIN
+      await _authService.signIn(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      
+      setState(() {
+        _isLoading = false;
+      });
 
-    // Simuliere API-Call
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (mounted) {
+      if (mounted) {
+        // Erfolgreicher Login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Zur Home-Seite navigieren
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } on AuthException catch (e) {
+      // Supabase spezifische Fehler
+      setState(() {
+        _isLoading = false;
+      });
+      
+      String errorMessage = 'Login failed';
+      if (e.message.contains('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password';
+      } else if (e.message.contains('Email not confirmed')) {
+        errorMessage = 'Please confirm your email first';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Allgemeine Fehler
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  // PASSWORT ZURÜCKSETZEN
+  Future<void> _handleForgotPassword() async {
+    if (_emailController.text.isEmpty || !_emailController.text.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Login successful!'),
-          backgroundColor: Colors.green,
+          content: Text('Please enter a valid email address'),
+          backgroundColor: Colors.red,
         ),
       );
-      Navigator.pushNamed(context, '/home');
+      return;
+    }
+    
+    try {
+      await _authService.resetPassword(_emailController.text.trim());
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent! Check your inbox.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -204,16 +264,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Forgot Password Link
+                          // Forgot Password Link 
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/forgot-password',
-                                );
-                              },
+                              onPressed: _handleForgotPassword, 
                               child: const Text(
                                 'Forgot Password?',
                                 style: TextStyle(

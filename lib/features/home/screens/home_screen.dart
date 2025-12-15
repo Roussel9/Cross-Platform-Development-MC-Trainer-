@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:mc_trainer/core/constants/app_colors.dart';
-import 'package:mc_trainer/core/constants/app_strings.dart';
-import 'package:mc_trainer/features/home/widgets/category_card.dart';
-import 'package:mc_trainer/features/home/widgets/quiz_card.dart';
+import 'package:mc_trainer_kami/core/constants/app_colors.dart';
+import 'package:mc_trainer_kami/core/constants/app_strings.dart';
+import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
+import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

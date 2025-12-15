@@ -97,7 +97,7 @@ class AuthService {
   
   // PASSWORT ZURÜCKSETZEN
   Future<void> resetPassword(String email) async {
-    // Für Flutter Web: redirectTo muss auf die URL deiner Web-App zeigen
+    
      final redirectUrl = kIsWeb
       ? 'https://mc-trainer-kami-k00che7pl-danielle-noelle-kami-tenis-projects.vercel.app/reset-password'
       : 'mc-trainer-kami://reset-password';

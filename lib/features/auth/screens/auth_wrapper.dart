@@ -20,10 +20,10 @@ class AuthWrapper extends StatelessWidget {
           final session = authState.session;
           
           if (session != null) {
-            // User ist eingeloggt → HomeScreen zeigen
+            
             return const HomeScreen();
           } else {
-            // User ist nicht eingeloggt → LoginScreen zeigen
+          
             return const LoginScreen();
           }
         }

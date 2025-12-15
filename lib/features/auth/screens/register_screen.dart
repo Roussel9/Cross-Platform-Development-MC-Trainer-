@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,6 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _acceptTerms = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
@@ -47,37 +51,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _isLoading = true;
     });
 
-    // TODO: Hier wird später die Supabase-Integration implementiert
-    // Beispiel:
-    // try {
-    //   await supabase.auth.signUp(
-    //     email: _emailController.text,
-    //     password: _passwordController.text,
-    //     data: {
-    //       'first_name': _firstNameController.text,
-    //       'last_name': _lastNameController.text,
-    //       'username': _usernameController.text,
-    //     },
-    //   );
-    //   // Navigation zur Home-Seite
-    // } catch (e) {
-    //   // Fehlerbehandlung
-    // }
-
-    // Simuliere API-Call
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully!'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      // SUPABASE REGISTRIERUNG
+      final response = await _authService.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        username: _usernameController.text.trim(),
       );
+      
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (response.user != null) {
+        if (mounted) {
+          // Erfolgreiche Registrierung
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 5),
+            ),
+          );
+          
+          // Zur Login-Seite navigieren
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      }
+    } on AuthException catch (e) {
+      // Supabase spezifische Fehler
+      setState(() {
+        _isLoading = false;
+      });
+      
+      String errorMessage = 'Registration failed';
+      if (e.message.contains('User already registered')) {
+        errorMessage = 'This email is already registered';
+      } else if (e.message.contains('Password')) {
+        errorMessage = 'Password is too weak';
+      } else if (e.message.contains('email')) {
+        errorMessage = 'Invalid email format';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Allgemeine Fehler
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
