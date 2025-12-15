@@ -34,7 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Widget _buildStatCard({required IconData icon, required String value, required String label}) {
+  // --- Widgets for the Header Area (unverändert) ---
+  Widget _buildStatCard({
+    required IconData icon,
+    required String value,
+    required String label,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
