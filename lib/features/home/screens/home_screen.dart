@@ -6,7 +6,7 @@ import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
 import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
-
+import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
 import '../../../main.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -284,7 +284,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             title: 'Browse Modules',
                             subtitle: '${backend.lastModules.length} modules available',
                             iconColor: Theme.of(context).colorScheme.primary,
-                            onTap: () {},
+                                      onTap: () {
+              // Navigiere zum neuen Modul-Listen-Screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ModuleListScreen(),
+                ),
+              );
+            },
+
                           ),
                           CategoryCard(
                             icon: Icons.emoji_events_outlined,
