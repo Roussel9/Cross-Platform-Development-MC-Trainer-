@@ -5,6 +5,7 @@ import 'package:mc_trainer_kami/core/constants/app_strings.dart';
 import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
+import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
 
 import '../../../main.dart';
 
@@ -172,8 +173,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CircleAvatar(
                       backgroundColor: Colors.grey,
                       radius: 15,
-                      child: const Text(
-                        'JD',
+                      child:  Text(
+                        backend.userInitials,
                         style: TextStyle(
                           color: AppColors.primaryColorDark,
                           fontWeight: FontWeight.bold,
@@ -207,14 +208,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            AppStrings.homeWelcome,
+                            Text(
+                            'Welcome back, ${backend.userName}!',
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 22,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 22,
                             ),
-                          ),
+                            ),
+
+
                           const SizedBox(height: 4),
                           Text(
                             AppStrings.homeQuote,
