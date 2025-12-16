@@ -5,6 +5,9 @@ import 'package:mc_trainer_kami/core/constants/app_strings.dart';
 import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
+import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
+import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
+import '../../../main.dart';
 import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -653,10 +656,136 @@ class _HomeScreenState extends State<HomeScreen> {
                           MediaQuery.of(context).padding.top,
                     ),
                     const SizedBox(height: 20),
+<<<<<<< lib/features/home/screens/home_screen.dart
+                    // Header Statistiken
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: AppColors.appHeaderBackgroundGradient,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryColorDark.withOpacity(0.5),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                            Text(
+                            'Welcome back, ${backend.userName}!',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 22,
+                            ),
+                            ),
+
+
+                          const SizedBox(height: 4),
+                          Text(
+                            AppStrings.homeQuote,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildStatCard(
+                            icon: Icons.my_location_outlined,
+                            value: backend.questionsThisWeek.toString(),
+                            label: 'Questions this week',
+                          ),
+                          _buildStatCard(
+                            icon: Icons.watch_later_outlined,
+                            value: '${backend.currentStreak} days',
+                            label: 'Current streak',
+                          ),
+                          _buildStatCard(
+                            icon: Icons.workspace_premium_outlined,
+                            value: '${backend.modulesCompleted}/${backend.lastModules.length}',
+                            label: 'Modules completed',
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Main Content
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppStrings.continueLearning,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Letzte Module anzeigen
+                          ...backend.lastModules.map(
+                                (module) => QuizCard(
+                              moduleTitle: module.name,
+                              moduleDescription: module.description ?? '',
+                              progress: 0.65, // Hier ggf. Fortschritt aus DB berechnen
+                              onResume: () {},
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            AppStrings.quickActions,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          CategoryCard(
+                            icon: Icons.stacked_bar_chart,
+                            title: 'Browse Modules',
+                            subtitle: '${backend.lastModules.length} modules available',
+                            iconColor: Theme.of(context).colorScheme.primary,
+                                      onTap: () {
+              // Navigiere zum neuen Modul-Listen-Screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ModuleListScreen(),
+                ),
+              );
+            },
+
+                          ),
+                          CategoryCard(
+                            icon: Icons.emoji_events_outlined,
+                            title: 'Achievements',
+                            subtitle: '${backend.achievements.where((a) => a['earned'] == true).length} badges earned',
+                            iconColor: Theme.of(context).colorScheme.secondary,
+                            onTap: () {},
+                          ),
+                          CategoryCard(
+                            icon: Icons.trending_up,
+                            title: 'Statistics',
+                            subtitle: 'Track your progress',
+                            iconColor: Colors.green.shade700,
+                            onTap: () {},
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                      ),
+                    ),
+=======
                     // Header Content mit Provider-Daten
                     _buildHeaderContent(context, backend),
                     // Main Content mit Provider-Daten
                     _buildMainContent(context, backend),
+>>>>>>> lib/features/home/screens/home_screen.dart
                   ],
                 ),
               ),
