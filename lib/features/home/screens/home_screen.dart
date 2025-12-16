@@ -115,18 +115,16 @@ class _HomeScreenState extends State<HomeScreen> {
     // Navigationslogik für die Bottom Bar
     switch (index) {
       case 0: // Home
-      // Bereits auf Home, nichts tun oder zurückscrollen
+        // Bereits auf Home, nichts tun oder zurückscrollen
         break;
       case 1: // Modules
-      // TODO: Hier ModuleScreen Navigation implementieren
-      // Navigator.push(context, MaterialPageRoute(builder: (context) => ModulesScreen()));
+        // TODO: Hier ModuleScreen Navigation implementieren
+        // Navigator.push(context, MaterialPageRoute(builder: (context) => ModulesScreen()));
         break;
       case 2: // Profile
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const ProfileScreen(),
-          ),
+          MaterialPageRoute(builder: (context) => const ProfileScreen()),
         );
         // Setze den Index zurück auf Home nach der Navigation
         Future.delayed(const Duration(milliseconds: 100), () {
@@ -292,11 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   : Colors.grey[400],
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              achievement.icon,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: Icon(achievement.icon, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 16),
 
@@ -320,14 +314,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (achievement.isUnlocked)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: achievement.color.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.star, size: 14, color: Colors.amber),
+                            const Icon(
+                              Icons.star,
+                              size: 14,
+                              color: Colors.amber,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${achievement.points} pts',
@@ -406,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           // Letzte Module anzeigen
           ...backend.lastModules.map(
-                (module) => QuizCard(
+            (module) => QuizCard(
               moduleTitle: module.name,
               moduleDescription: module.description ?? '',
               progress: 0.65,
@@ -426,14 +427,21 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Browse Modules Karte
+          const SizedBox(height: 8),
           CategoryCard(
             icon: Icons.stacked_bar_chart,
             title: 'Browse Modules',
             subtitle: '${backend.lastModules.length} modules available',
             iconColor: Theme.of(context).colorScheme.primary,
-            onTap: () {},
-            showArrow: true, // "Go" anzeigen
+            onTap: () {
+              // Navigiere zum neuen Modul-Listen-Screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ModuleListScreen(),
+                ),
+              );
+            },
           ),
 
           // Achievements Karte (mit expandierbaren Details)
@@ -443,12 +451,15 @@ class _HomeScreenState extends State<HomeScreen> {
               CategoryCard(
                 icon: Icons.emoji_events_outlined,
                 title: 'Achievements',
-                subtitle: 'View your badges and rewards ($unlockedCount/$totalCount)',
+                subtitle:
+                    'View your badges and rewards ($unlockedCount/$totalCount)',
                 iconColor: Theme.of(context).colorScheme.secondary,
                 onTap: _toggleAchievementsDetails,
                 showArrow: false, // KEIN "Go" - stattdessen expand/collapse
                 trailing: Icon(
-                  _showAchievementsDetails ? Icons.expand_less : Icons.expand_more,
+                  _showAchievementsDetails
+                      ? Icons.expand_less
+                      : Icons.expand_more,
                   color: AppColors.primaryColorLight,
                   size: 24,
                 ),
@@ -509,9 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // Navigation zur Profilseite (wo die Statistiken sind)
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfileScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
               );
             },
             showArrow: true, // "Go" anzeigen
@@ -534,9 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         if (backend.error != null) {
-          return Scaffold(
-            body: Center(child: Text(backend.error!)),
-          );
+          return Scaffold(body: Center(child: Text(backend.error!)));
         }
 
         return Stack(
@@ -551,7 +558,9 @@ class _HomeScreenState extends State<HomeScreen> {
             // 2. Transparenter Gradient
             Positioned.fill(
               child: Container(
-                decoration: BoxDecoration(gradient: AppColors.darkOverlayGradient),
+                decoration: BoxDecoration(
+                  gradient: AppColors.darkOverlayGradient,
+                ),
               ),
             ),
             // 3. Scaffold mit Inhalt
@@ -652,146 +661,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // Abstand für die transparente AppBar
                     SizedBox(
-                      height: AppBar().preferredSize.height +
+                      height:
+                          AppBar().preferredSize.height +
                           MediaQuery.of(context).padding.top,
                     ),
                     const SizedBox(height: 20),
-<<<<<<< lib/features/home/screens/home_screen.dart
                     // Header Statistiken
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: AppColors.appHeaderBackgroundGradient,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryColorDark.withOpacity(0.5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                            Text(
-                            'Welcome back, ${backend.userName}!',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 22,
-                            ),
-                            ),
-
-
-                          const SizedBox(height: 4),
-                          Text(
-                            AppStrings.homeQuote,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _buildStatCard(
-                            icon: Icons.my_location_outlined,
-                            value: backend.questionsThisWeek.toString(),
-                            label: 'Questions this week',
-                          ),
-                          _buildStatCard(
-                            icon: Icons.watch_later_outlined,
-                            value: '${backend.currentStreak} days',
-                            label: 'Current streak',
-                          ),
-                          _buildStatCard(
-                            icon: Icons.workspace_premium_outlined,
-                            value: '${backend.modulesCompleted}/${backend.lastModules.length}',
-                            label: 'Modules completed',
-                          ),
-                        ],
-                      ),
-                    ),
                     // Main Content
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.continueLearning,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontSize: 20,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Letzte Module anzeigen
-                          ...backend.lastModules.map(
-                                (module) => QuizCard(
-                              moduleTitle: module.name,
-                              moduleDescription: module.description ?? '',
-                              progress: 0.65, // Hier ggf. Fortschritt aus DB berechnen
-                              onResume: () {},
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            AppStrings.quickActions,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontSize: 20,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          CategoryCard(
-                            icon: Icons.stacked_bar_chart,
-                            title: 'Browse Modules',
-                            subtitle: '${backend.lastModules.length} modules available',
-                            iconColor: Theme.of(context).colorScheme.primary,
-                                      onTap: () {
-              // Navigiere zum neuen Modul-Listen-Screen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ModuleListScreen(),
-                ),
-              );
-            },
-
-                          ),
-                          CategoryCard(
-                            icon: Icons.emoji_events_outlined,
-                            title: 'Achievements',
-                            subtitle: '${backend.achievements.where((a) => a['earned'] == true).length} badges earned',
-                            iconColor: Theme.of(context).colorScheme.secondary,
-                            onTap: () {},
-                          ),
-                          CategoryCard(
-                            icon: Icons.trending_up,
-                            title: 'Statistics',
-                            subtitle: 'Track your progress',
-                            iconColor: Colors.green.shade700,
-                            onTap: () {},
-                          ),
-                          const SizedBox(height: 32),
-                        ],
-                      ),
-                    ),
-=======
                     // Header Content mit Provider-Daten
                     _buildHeaderContent(context, backend),
                     // Main Content mit Provider-Daten
                     _buildMainContent(context, backend),
->>>>>>> lib/features/home/screens/home_screen.dart
                   ],
                 ),
               ),
               bottomNavigationBar: BottomNavigationBar(
                 items: const <BottomNavigationBarItem>[
-                  BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
                   BottomNavigationBarItem(
                     icon: Icon(Icons.library_books),
                     label: 'Modules',
