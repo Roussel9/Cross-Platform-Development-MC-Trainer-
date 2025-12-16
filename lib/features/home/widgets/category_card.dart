@@ -4,16 +4,20 @@ class CategoryCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
   final Color iconColor;
+  final VoidCallback onTap;
+  final bool showArrow;
+  final Widget? trailing;
 
   const CategoryCard({
     super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.onTap,
     required this.iconColor,
+    required this.onTap,
+    this.showArrow = true,
+    this.trailing,
   });
 
   @override
@@ -39,6 +43,7 @@ class CategoryCard extends StatelessWidget {
                 child: Icon(icon, color: iconColor, size: 30),
               ),
               const SizedBox(width: 16),
+
               // Text Content
               Expanded(
                 child: Column(
@@ -62,20 +67,24 @@ class CategoryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Action Link/Button
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Go >',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
+
+              // Action Link/Button oder Custom Trailing
+              if (trailing != null)
+                trailing!
+              else if (showArrow)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Go >',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-              ),
+                    const SizedBox(width: 4),
+                  ],
+                ),
             ],
           ),
         ),
