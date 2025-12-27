@@ -118,8 +118,19 @@ class _HomeScreenState extends State<HomeScreen> {
         // Bereits auf Home, nichts tun oder zurückscrollen
         break;
       case 1: // Modules
-        // TODO: Hier ModuleScreen Navigation implementieren
-        // Navigator.push(context, MaterialPageRoute(builder: (context) => ModulesScreen()));
+        // Navigiere zum neuen Modul-Listen-Screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ModuleListScreen()),
+        );
+        // Setze den Index zurück auf Home nach der Navigation
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              _selectedIndex = 0;
+            });
+          }
+        });
         break;
       case 2: // Profile
         Navigator.push(
@@ -228,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back, ${backend.userName}!',
+            'Welcome, ${backend.userName}!',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -256,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           _buildStatCard(
             icon: Icons.workspace_premium_outlined,
-            value: '${backend.modulesCompleted}/${backend.lastModules.length}',
+            value: '${backend.lastModules.length}/${backend.modulesCompleted}',
             label: 'Modules completed',
           ),
         ],
