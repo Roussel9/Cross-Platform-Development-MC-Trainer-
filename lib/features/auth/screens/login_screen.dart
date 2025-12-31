@@ -12,20 +12,73 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
-  
+
   final AuthService _authService = AuthService();
 
   @override
   void dispose() {
     _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.signIn(
+        identifier: _identifierController.text,
+        password: _passwordController.text,
+      );
+
+      if (mounted) {
+        // Erfolgreicher Login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() => _isLoading = false);
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } on AuthException catch (e) {
+      setState(() => _isLoading = false);
+      String errorMessage = 'Invalid credentials';
+      if (e.message.contains('Username')) {
+        errorMessage = 'Username was not found';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      // Allgemeine Fehler
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /*Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -37,10 +90,10 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       // SUPABASE LOGIN
       await _authService.signIn(
-        email: _emailController.text.trim(),
+        identifier: _identifierController.text.trim(),
         password: _passwordController.text,
       );
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -53,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Zur Home-Seite navigieren
         Navigator.pushReplacementNamed(context, '/home');
       }
@@ -62,20 +115,17 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       String errorMessage = 'Login failed';
       if (e.message.contains('Invalid login credentials')) {
         errorMessage = 'Invalid email or password';
       } else if (e.message.contains('Email not confirmed')) {
         errorMessage = 'Please confirm your email first';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -83,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -93,8 +143,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     }
-  }
-  
+  } */
+
   // PASSWORT ZURÜCKSETZEN
   Future<void> _handleForgotPassword() async {
     if (_emailController.text.isEmpty || !_emailController.text.contains('@')) {
@@ -106,10 +156,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
-    
+
     try {
       await _authService.resetPassword(_emailController.text.trim());
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -191,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Title
                           const Text(
-                            'Welcome Back',
+                            'Welcome',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -200,7 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Sign in to continue your learning journey',
+                            'Sign in to start or continue your learning journey',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
@@ -209,23 +259,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 32),
 
-                          // Email Field
+                          // Email / Username Field
                           TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                            controller: _identifierController,
+                            keyboardType: TextInputType.text,
                             decoration: InputDecoration(
-                              labelText: 'Email Address *',
-                              prefixIcon: const Icon(Icons.email_outlined),
+                              labelText:
+                                  'Email or Username *', // Label geändert
+                              prefixIcon: const Icon(
+                                Icons.person_outline,
+                              ), // Icon geändert
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
+                                return 'Please enter your email or username';
                               }
                               return null;
                             },
@@ -264,11 +314,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Forgot Password Link 
+                          // Forgot Password Link
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: _handleForgotPassword, 
+                              onPressed: _handleForgotPassword,
                               child: const Text(
                                 'Forgot Password?',
                                 style: TextStyle(

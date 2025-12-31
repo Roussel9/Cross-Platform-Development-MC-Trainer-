@@ -16,18 +16,19 @@ extension StringCasingExtension on String {
 class BackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  String userName = '';       // Vollständiger Name des Benutzers
-  String userInitials = '';         // Initialen für Avatar
-  int questionsThisWeek = 0;          // Anzahl der Fragen diese Woche
-  int currentStreak = 0;              // Aktuelle Serie (Streak)
-  int modulesCompleted = 0;           // Anzahl abgeschlossener Module
+  String userName = ''; //  Username des Benutzers
+  String fullName = ''; // Vollständiger Name des Benutzers
+  String userInitials = ''; // Initialen für Avatar
+  int questionsThisWeek = 0; // Anzahl der Fragen diese Woche
+  int currentStreak = 0; // Aktuelle Serie (Streak)
+  int modulesCompleted = 0; // Anzahl abgeschlossener Module
 
-  List<LernenModule> lastModules = [];           // Letzte Module
-  Map<String, dynamic>? lastSession;            // Letzte Session
+  List<LernenModule> lastModules = []; // Letzte Module
+  Map<String, dynamic>? lastSession; // Letzte Session
   List<Map<String, dynamic>> achievements = []; // Errungenschaften
 
-  bool isLoading = false;           // Ladezustand
-  String? error;                    // Fehlernachricht
+  bool isLoading = false; // Ladezustand
+  String? error; // Fehlernachricht
 
   // Konstruktor lädt direkt die Home-Daten
   HomeBackendProvider() {
@@ -54,13 +55,16 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
 
       if (user != null) {
-        final fullName = user.userMetadata?['full_name'];
+        final myFullName = user.userMetadata?['full_name'];
+        final myname = user.userMetadata?['username'];
 
-        userName = (fullName != null && fullName.isNotEmpty)
-            ? fullName
+        userName = (myname != null && myname.isNotEmpty)
+            ? myname
             : user.email?.split('@').first.capitalize() ?? 'User';
 
-        userInitials = userName
+        fullName = myFullName;
+
+        userInitials = fullName
             .split(' ')
             .where((e) => e.isNotEmpty)
             .map((e) => e[0])
@@ -70,21 +74,21 @@ class BackendProvider with ChangeNotifier {
       }
 
       // --- Letzte Session abrufen ---
-      final sessions = await _supabase
-          .from('learning_sessions')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(1) as List<dynamic>;
+      final sessions =
+          await _supabase
+                  .from('learning_sessions')
+                  .select()
+                  .order('created_at', ascending: false)
+                  .limit(1)
+              as List<dynamic>;
 
       if (sessions.isNotEmpty) {
         lastSession = sessions.first as Map<String, dynamic>;
       }
 
       // --- Letzte Module abrufen ---
-      final modules = await _supabase
-          .from('modules')
-          .select('*')
-          .limit(3) as List<dynamic>;
+      final modules =
+          await _supabase.from('modules').select('*').limit(3) as List<dynamic>;
 
       lastModules = modules
           .map((e) => LernenModule.fromJson(e as Map<String, dynamic>))
@@ -93,7 +97,7 @@ class BackendProvider with ChangeNotifier {
       // --- Statistiken setzen ---
       questionsThisWeek = lastSession?['total_questions'] ?? 0;
       modulesCompleted = 5; // TODO: aus Datenbank berechnen
-      currentStreak = 7;    // TODO: aus Datenbank berechnen
+      currentStreak = 7; // TODO: aus Datenbank berechnen
 
       // --- Errungenschaften setzen ---
       achievements = [
@@ -108,15 +112,15 @@ class BackendProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
   // Module separat laden (z.B. für Modules Screen)
   Future<void> fetchModules() async {
     isLoading = true;
     notifyListeners();
 
     try {
-      final modules = await _supabase
-          .from('modules')
-          .select('*') as List<dynamic>;
+      final modules =
+          await _supabase.from('modules').select('*') as List<dynamic>;
 
       lastModules = modules
           .map((e) => LernenModule.fromJson(e as Map<String, dynamic>))
@@ -128,8 +132,6 @@ class BackendProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
-
 }
 
 // --- Home Screen ---
@@ -199,9 +201,7 @@ class HomeScreen extends StatelessWidget {
           }
 
           if (provider.error != null) {
-            return Scaffold(
-              body: Center(child: Text(provider.error!)),
-            );
+            return Scaffold(body: Center(child: Text(provider.error!)));
           }
 
           return Scaffold(
@@ -216,11 +216,14 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // --- Begrüßung mit vollständigem Namen ---
-                        Text('Welcome back, ${provider.userName}!',
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        Text(
+                          'Welcome, ${provider.userName}!',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           'Education is the passport to the future!',
@@ -243,26 +246,33 @@ class HomeScreen extends StatelessWidget {
                           label: 'Modules completed',
                         ),
                         const SizedBox(height: 24),
-                        const Text('Continue where you left off',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        const Text(
+                          'Continue where you left off',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         for (var module in provider.lastModules)
                           QuizCard(
                             moduleTitle: module.name,
                             moduleDescription: module.description ?? '',
-                            progress:
-                            provider.calculateProgress(provider.lastSession),
+                            progress: provider.calculateProgress(
+                              provider.lastSession,
+                            ),
                             onResume: () {},
                           ),
                         const SizedBox(height: 24),
-                        const Text('Quick Actions',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        const Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         CategoryCard(
                           icon: Icons.stacked_bar_chart,
