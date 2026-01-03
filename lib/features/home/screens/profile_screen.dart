@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/theme/app_theme.dart';
+import 'package:mc_trainer_kami/provider/backend_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,23 +15,40 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
-  late String _firstName;
-  late String _lastName;
-  late String _email;
-  late String _birthDate;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
+  late TextEditingController _emailController;
+  late TextEditingController _birthDateController;
 
-  // Für Bildauswahl
-  File? _selectedImageFile;
   final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    // Initialwerte setzen
-    _firstName = 'John';
-    _lastName = 'Doe';
-    _email = 'student@example.com';
-    _birthDate = '15.06.1995';
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    final backend = context.read<BackendProvider>();
+
+    // Namen aus Backend splitten
+    final nameParts = backend.fullName.split(' ');
+    final firstName = nameParts.isNotEmpty ? nameParts.first : 'User';
+    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+    _firstNameController = TextEditingController(text: firstName);
+    _lastNameController = TextEditingController(text: lastName);
+    _emailController = TextEditingController(text: backend.email);
+    _birthDateController = TextEditingController(text: '');
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _birthDateController.dispose();
+    super.dispose();
   }
 
   void _toggleEditMode() {
@@ -39,31 +58,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _cancelEditing() {
-    setState(() {
-      _isEditing = false;
-      // Werte auf ursprüngliche zurücksetzen
-      _firstName = 'John';
-      _lastName = 'Doe';
-      _email = 'student@example.com';
-      _birthDate = '15.06.1995';
-    });
-  }
-
-  void _saveChanges() {
-    // Hier würdest du die Daten speichern (API/Datenbank)
+    _initializeControllers();
     setState(() {
       _isEditing = false;
     });
-    // Zeige Erfolgsmeldung
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Änderungen gespeichert'),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 
-  // Abmelde-Funktion mit Bestätigungsdialog
+  Future<void> _saveChanges() async {
+    // TODO: Hier Änderungen in Supabase speichern
+    setState(() {
+      _isEditing = false;
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Änderungen gespeichert'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   Future<void> _showLogoutDialog() async {
     return showDialog(
       context: context,
@@ -75,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Dialog schließen
+                Navigator.of(context).pop();
               },
               child: const Text(
                 'Abbrechen',
@@ -84,8 +99,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Dialog schließen
-                _performLogout(); // Abmeldung durchführen
+                Navigator.of(context).pop();
+                _performLogout();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
@@ -99,12 +114,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Eigentliche Abmelde-Logik
   void _performLogout() {
-    // Hier würde die tatsächliche Abmeldelogik stehen
-    // z.B.: Auth-Provider aufrufen, Token löschen, zur Login-Seite navigieren
-
-    // Zeige Erfolgsmeldung
+    // TODO: Authentifizierung mit Backend abmelden
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Erfolgreich abgemeldet'),
@@ -112,21 +123,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         duration: Duration(seconds: 2),
       ),
     );
-
-    // Simuliere Navigation zur Login-Seite
-    // In einer echten App: Navigator.pushReplacementNamed(context, '/login');
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      // TODO: Hier zur Login-Seite navigieren
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (context) => LoginScreen()),
-      // );
-    });
   }
 
-  // Echte Bildauswahl mit image_picker
   Future<void> _selectProfileImage() async {
-    // Zeige Auswahl-Dialog (Kamera oder Galerie)
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -140,9 +139,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     leading: Icon(Icons.photo_library),
                     title: Text('Aus Galerie auswählen'),
                   ),
-                  onTap: () async {
+                  onTap: () {
                     Navigator.pop(context);
-                    await _pickImageFromGallery();
+                    _pickImageFromGallery();
                   },
                 ),
                 GestureDetector(
@@ -150,9 +149,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     leading: Icon(Icons.camera_alt),
                     title: Text('Foto aufnehmen'),
                   ),
-                  onTap: () async {
+                  onTap: () {
                     Navigator.pop(context);
-                    await _pickImageFromCamera();
+                    _pickImageFromCamera();
                   },
                 ),
               ],
@@ -167,29 +166,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
+        maxWidth: 500,
+        maxHeight: 500,
         imageQuality: 85,
       );
 
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profilbild ausgewählt'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (pickedFile != null && mounted) {
+        final backend = context.read<BackendProvider>();
+        backend.selectedImageFile = File(pickedFile.path);
+        setState(() {});
+
+        await backend.setPicture();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profilbild hochgeladen'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -197,27 +200,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 800,
-        maxHeight: 800,
+        maxWidth: 500,
+        maxHeight: 500,
         imageQuality: 85,
       );
 
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Foto aufgenommen'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (pickedFile != null && mounted) {
+        final backend = context.read<BackendProvider>();
+        backend.selectedImageFile = File(pickedFile.path);
+        setState(() {});
+
+        await backend.setPicture();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto hochgeladen'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteProfileImage() async {
+    final backend = context.read<BackendProvider>();
+    await backend.deletePicture();
+    setState(() {});
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler: $e'),
-          backgroundColor: Colors.red,
+        const SnackBar(
+          content: Text('Profilbild gelöscht'),
+          backgroundColor: Colors.green,
         ),
       );
     }
@@ -235,10 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         appBar: AppBar(
           title: const Text(
             'Profil',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
           ),
           centerTitle: true,
           elevation: 0,
@@ -246,47 +264,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
           foregroundColor: AppColors.primaryColorDark,
           iconTheme: IconThemeData(color: AppColors.primaryColorDark),
         ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                ),
-                child: IntrinsicHeight(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 12.0 : 16.0,
+        body: Consumer<BackendProvider>(
+          builder: (context, backend, _) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header mit Profilinformationen
-                        _buildProfileHeader(isSmallScreen),
-                        SizedBox(height: isSmallScreen ? 16 : 24),
-
-                        // Lernstatistiken Section
-                        _buildLearningStatsSection(isSmallScreen),
-                        SizedBox(height: isSmallScreen ? 16 : 24),
-
-                        // Persönliche Informationen Section
-                        _buildPersonalInfoSection(isSmallScreen),
-                        SizedBox(height: isSmallScreen ? 24 : 32),
-
-                        // Nur Abbrechen/Speichern Buttons zeigen, wenn im Bearbeitungsmodus
-                        if (_isEditing) _buildActionButtons(isSmallScreen),
-
-                        // Abmelden Button (immer sichtbar)
-                        _buildLogoutButton(isSmallScreen),
-
-                        // Flexibler Platz am Ende
-                        const Spacer(),
-                        SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-                      ],
+                    child: IntrinsicHeight(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12.0 : 16.0,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildProfileHeader(backend, isSmallScreen),
+                            SizedBox(height: isSmallScreen ? 16 : 24),
+                            _buildLearningStatsSection(backend, isSmallScreen),
+                            SizedBox(height: isSmallScreen ? 16 : 24),
+                            _buildPersonalInfoSection(isSmallScreen),
+                            SizedBox(height: isSmallScreen ? 24 : 32),
+                            if (_isEditing) _buildActionButtons(isSmallScreen),
+                            _buildLogoutButton(isSmallScreen),
+                            const Spacer(),
+                            SizedBox(
+                              height:
+                                  MediaQuery.of(context).padding.bottom + 16,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             );
           },
         ),
@@ -294,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(bool isSmallScreen) {
+  Widget _buildProfileHeader(BackendProvider backend, bool isSmallScreen) {
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
       decoration: BoxDecoration(
@@ -310,7 +324,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          // Profilbild mit Bearbeitungs-Icon (immer sichtbar)
           GestureDetector(
             onTap: _selectProfileImage,
             child: Stack(
@@ -325,22 +338,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.white,
                       width: isSmallScreen ? 2 : 3,
                     ),
-                    image: _selectedImageFile != null
+                    image: backend.selectedImageFile != null
                         ? DecorationImage(
-                      image: FileImage(_selectedImageFile!),
-                      fit: BoxFit.cover,
-                    )
+                            image: FileImage(backend.selectedImageFile!),
+                            fit: BoxFit.cover,
+                          )
                         : null,
                   ),
-                  child: _selectedImageFile == null
+                  child: backend.selectedImageFile == null
                       ? Icon(
-                    Icons.person,
-                    size: isSmallScreen ? 30 : 40,
-                    color: Colors.white,
-                  )
+                          Icons.person,
+                          size: isSmallScreen ? 30 : 40,
+                          color: Colors.white,
+                        )
                       : null,
                 ),
-                // Stift-Icon immer sichtbar auf dem Profilbild
+                // Edit Button
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -361,19 +374,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
+                // Delete Button
+                if (backend.selectedImageFile != null)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _deleteProfileImage,
+                      child: Container(
+                        padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          size: isSmallScreen ? 12 : 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
           SizedBox(width: isSmallScreen ? 12 : 20),
-
-          // Profilinformationen
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name
                 Text(
-                  '$_firstName $_lastName',
+                  backend.fullName.isNotEmpty
+                      ? backend.fullName
+                      : backend.userName,
                   style: TextStyle(
                     fontSize: isSmallScreen ? 18 : 24,
                     fontWeight: FontWeight.bold,
@@ -382,12 +416,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 SizedBox(height: isSmallScreen ? 2 : 4),
-
-                // E-Mail
                 Text(
-                  _email,
+                  backend.email,
                   style: TextStyle(
                     fontSize: isSmallScreen ? 12 : 14,
                     color: Colors.white.withOpacity(0.9),
@@ -395,28 +426,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 SizedBox(height: isSmallScreen ? 4 : 8),
                 Text(
-                  'Mitglied seit Dezember 2025',
+                  'Initialen: ${backend.userInitials}',
                   style: TextStyle(
                     fontSize: isSmallScreen ? 10 : 12,
                     color: Colors.white.withOpacity(0.8),
                   ),
                 ),
-
-                // Fragen & Module Counter
                 SizedBox(height: isSmallScreen ? 8 : 16),
                 Row(
                   children: [
                     _buildCounterItem(
-                      count: '1247',
+                      count: backend.questionsThisWeek.toString(),
                       label: 'Fragen',
                       isSmallScreen: isSmallScreen,
                     ),
                     SizedBox(width: isSmallScreen ? 12 : 20),
                     _buildCounterItem(
-                      count: '5',
+                      count: backend.modulesCompleted.toString(),
                       label: 'Module',
                       isSmallScreen: isSmallScreen,
                     ),
@@ -457,7 +485,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLearningStatsSection(bool isSmallScreen) {
+  Widget _buildLearningStatsSection(
+    BackendProvider backend,
+    bool isSmallScreen,
+  ) {
+    final progress = backend.calculateProgress(backend.lastSession);
+    final progressPercentage = (progress * 100).toStringAsFixed(0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -475,7 +509,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
-
         Container(
           padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
           decoration: BoxDecoration(
@@ -491,31 +524,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           child: Column(
             children: [
-              // Gelernte Stunden
               _buildStatRow(
                 icon: Icons.timer_outlined,
-                label: 'Gelernte Stunden',
-                value: '48h',
+                label: 'Fragen diese Woche',
+                value: backend.questionsThisWeek.toString(),
                 valueColor: Colors.green,
                 isSmallScreen: isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 12 : 16),
-
-              // Durchschnittliche Punktzahl
               _buildStatRow(
                 icon: Icons.bar_chart_outlined,
-                label: 'Durchschnittliche Punktzahl',
-                value: '87%',
+                label: 'Fortschritt',
+                value: '$progressPercentage%',
                 valueColor: AppColors.primaryColorLight,
                 isSmallScreen: isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 12 : 16),
-
-              // Module abgeschlossen
               _buildStatRow(
-                icon: Icons.check_circle_outline,
-                label: 'Module abgeschlossen',
-                value: '3/5',
+                icon: Icons.local_fire_department,
+                label: 'Aktuelle Serie',
+                value: '${backend.currentStreak} Tage',
                 valueColor: Colors.orange,
                 isSmallScreen: isSmallScreen,
               ),
@@ -541,11 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: valueColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 10),
           ),
-          child: Icon(
-            icon,
-            color: valueColor,
-            size: isSmallScreen ? 20 : 24,
-          ),
+          child: Icon(icon, color: valueColor, size: isSmallScreen ? 20 : 24),
         ),
         SizedBox(width: isSmallScreen ? 12 : 16),
         Expanded(
@@ -595,7 +619,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
-
         Container(
           padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
           decoration: BoxDecoration(
@@ -645,63 +668,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-
               const Divider(thickness: 1),
               SizedBox(height: isSmallScreen ? 12 : 16),
-
-              // Vorname
               _buildPersonalInfoField(
                 label: 'Vorname *',
-                value: _firstName,
+                controller: _firstNameController,
                 isEditing: _isEditing,
-                onChanged: (value) {
-                  setState(() {
-                    _firstName = value;
-                  });
-                },
                 isSmallScreen: isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 12 : 16),
-
-              // Nachname
               _buildPersonalInfoField(
                 label: 'Nachname *',
-                value: _lastName,
+                controller: _lastNameController,
                 isEditing: _isEditing,
-                onChanged: (value) {
-                  setState(() {
-                    _lastName = value;
-                  });
-                },
                 isSmallScreen: isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 12 : 16),
-
-              // E-Mail
               _buildPersonalInfoField(
                 label: 'E-Mail *',
-                value: _email,
+                controller: _emailController,
                 isEditing: _isEditing,
-                onChanged: (value) {
-                  setState(() {
-                    _email = value;
-                  });
-                },
                 keyboardType: TextInputType.emailAddress,
                 isSmallScreen: isSmallScreen,
               ),
               SizedBox(height: isSmallScreen ? 12 : 16),
-
-              // Geburtsdatum
               _buildPersonalInfoField(
                 label: 'Geburtsdatum',
-                value: _birthDate,
+                controller: _birthDateController,
                 isEditing: _isEditing,
-                onChanged: (value) {
-                  setState(() {
-                    _birthDate = value;
-                  });
-                },
                 isSmallScreen: isSmallScreen,
               ),
             ],
@@ -713,9 +707,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPersonalInfoField({
     required String label,
-    required String value,
+    required TextEditingController controller,
     required bool isEditing,
-    required Function(String) onChanged,
     required bool isSmallScreen,
     TextInputType keyboardType = TextInputType.text,
   }) {
@@ -740,15 +733,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: isEditing ? Colors.white : Colors.grey[50],
             borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 12),
             border: Border.all(
-              color: isEditing ? AppColors.primaryColorLight : const Color(0xFFE0E0E0),
+              color: isEditing
+                  ? AppColors.primaryColorLight
+                  : const Color(0xFFE0E0E0),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: isEditing
-                    ? TextFormField(
-                  initialValue: value,
+          child: isEditing
+              ? TextFormField(
+                  controller: controller,
                   style: TextStyle(
                     fontSize: isSmallScreen ? 14 : 16,
                     color: Colors.black87,
@@ -759,24 +751,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       vertical: isSmallScreen ? 10 : 12,
                     ),
                   ),
-                  onChanged: onChanged,
                   keyboardType: keyboardType,
                 )
-                    : Padding(
+              : Padding(
                   padding: EdgeInsets.symmetric(
                     vertical: isSmallScreen ? 10 : 12,
                   ),
                   child: Text(
-                    value,
+                    controller.text,
                     style: TextStyle(
                       fontSize: isSmallScreen ? 14 : 16,
                       color: Colors.black87,
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -790,9 +778,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _cancelEditing,
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: AppColors.primaryColorLight),
-              padding: EdgeInsets.symmetric(
-                vertical: isSmallScreen ? 12 : 16,
-              ),
+              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 12),
               ),
@@ -814,9 +800,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColorLight,
               foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(
-                vertical: isSmallScreen ? 12 : 16,
-              ),
+              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 12),
               ),

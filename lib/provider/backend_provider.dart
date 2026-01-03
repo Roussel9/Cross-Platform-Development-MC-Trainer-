@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/constants/app_strings.dart';
@@ -16,8 +18,13 @@ extension StringCasingExtension on String {
 class BackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
+  // file Backend
+  File? selectedImageFile;
+  //bool isFileLoading = false;
+
   String userName = ''; //  Username des Benutzers
   String fullName = ''; // Vollständiger Name des Benutzers
+  String email = '';
   String userInitials = ''; // Initialen für Avatar
   int questionsThisWeek = 0; // Anzahl der Fragen diese Woche
   int currentStreak = 0; // Aktuelle Serie (Streak)
@@ -43,6 +50,104 @@ class BackendProvider with ChangeNotifier {
     return (correct / total).clamp(0.0, 1.0);
   }
 
+  // File speichern
+  Future<void> setPicture() async {
+    if (_supabase.auth.currentUser == null || selectedImageFile == null) return;
+
+    final userId = _supabase.auth.currentUser!.id;
+    //isFileLoading = true;
+    notifyListeners();
+
+    try {
+      final filePath = 'user_$userId/avatar.png';
+
+      // Upload
+      final response = await _supabase.storage
+          .from('avatar_profile')
+          .upload(
+            filePath,
+            selectedImageFile!,
+            fileOptions: FileOptions(upsert: true),
+          );
+
+      if (response.isEmpty) {
+        throw 'Upload fehlgeschlagen';
+      }
+
+      // Public URL holen
+      final publicUrl = _supabase.storage
+          .from('avatar_profile')
+          .getPublicUrl(filePath);
+
+      // URL in user_profile speichern
+      final updateRes = await _supabase
+          .from('user_profiles')
+          .update({'avatar_url': publicUrl})
+          .eq('id', userId);
+
+      if (updateRes.error != null) throw updateRes.error!;
+    } catch (e) {
+      print('Fehler beim Setzen des Avatars: $e');
+    } finally {
+      //isFileLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // File abrufen
+  Future<void> fetchPicture() async {
+    if (_supabase.auth.currentUser == null) return;
+
+    final userId = _supabase.auth.currentUser!.id;
+
+    try {
+      final res = await _supabase
+          .from('user_profiles')
+          .select('avatar_url')
+          .eq('id', userId)
+          .single();
+
+      if (res.isNotEmpty && res['avatar_url'] != null) {
+        // Hier nur URL speichern
+        selectedImageFile = File(res['avatar_url']);
+        print('Avatar URL: ${res['avatar_url']}');
+      }
+    } catch (e) {
+      print('Fehler beim Abrufen des Avatars: $e');
+    }
+
+    notifyListeners();
+  }
+
+  // File löschen
+  Future<void> deletePicture() async {
+    if (_supabase.auth.currentUser == null) return;
+
+    final userId = _supabase.auth.currentUser!.id;
+    //isFileLoading = true;
+    notifyListeners();
+
+    try {
+      final filePath = 'user_$userId/avatar.png';
+
+      // Datei im Storage löschen
+      await _supabase.storage.from('avatar_profile').remove([filePath]);
+
+      // URL in Tabelle leeren
+      await _supabase
+          .from('user_profiles')
+          .update({'avatar_url': null})
+          .eq('id', userId);
+
+      selectedImageFile = null;
+    } catch (e) {
+      print('Fehler beim Löschen des Avatars: $e');
+    } finally {
+      //isFileLoading = false;
+      notifyListeners();
+    }
+  }
+
   // --- Daten für Home Screen abrufen ---
   Future<void> fetchHomeData() async {
     isLoading = true;
@@ -64,6 +169,7 @@ class BackendProvider with ChangeNotifier {
 
         fullName = myFullName;
 
+        email = user.email!;
         userInitials = fullName
             .split(' ')
             .where((e) => e.isNotEmpty)
