@@ -70,7 +70,7 @@ class AuthService {
         final response = await _supabase
             .from('user_profiles')
             .select('email')
-            .eq('username', 'test3c')
+            .eq('username', identify)
             .maybeSingle();
 
         // Debugging:
