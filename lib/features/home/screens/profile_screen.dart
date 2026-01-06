@@ -575,12 +575,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 keyboardType: TextInputType.emailAddress,
                 isSmallScreen: isSmallScreen,
               ),
-              _buildPersonalInfoField(
-                label: 'Geburtsdatum',
-                controller: _birthDateController,
-                isEditing: _isEditing,
-                isSmallScreen: isSmallScreen,
-              ),
             ],
           ),
         ),
