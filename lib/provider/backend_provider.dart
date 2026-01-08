@@ -1,198 +1,214 @@
 import 'dart:io';
-
-import 'package:flutter/material.dart';
-import 'package:mc_trainer_kami/core/constants/app_colors.dart';
-import 'package:mc_trainer_kami/core/constants/app_strings.dart';
-import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
-import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/models/lernen_module.dart';
-import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// Avatar hochladen
+import 'package:flutter/foundation.dart'; // Für kIsWeb
 
 // Extension zur Großschreibung von Strings
 extension StringCasingExtension on String {
-  String capitalize() => '${this[0].toUpperCase()}${substring(1)}';
+  String capitalize() =>
+      isEmpty ? "" : '${this[0].toUpperCase()}${substring(1)}';
 }
 
-// --- Backend Provider ---
 class BackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  // file Backend
-  File? selectedImageFile;
-  //bool isFileLoading = false;
-
-  String userName = ''; //  Username des Benutzers
-  String fullName = ''; // Vollständiger Name des Benutzers
+  // Profil-Daten
+  String? avatarUrl = '';
+  File? selectedImageFile; // Lokale Datei für den Upload
+  String userName = '';
+  String fullName = '';
   String email = '';
-  String userInitials = ''; // Initialen für Avatar
-  int questionsThisWeek = 0; // Anzahl der Fragen diese Woche
-  int currentStreak = 0; // Aktuelle Serie (Streak)
-  int modulesCompleted = 0; // Anzahl abgeschlossener Module
+  String userInitials = '';
 
-  List<LernenModule> lastModules = []; // Letzte Module
-  Map<String, dynamic>? lastSession; // Letzte Session
-  List<Map<String, dynamic>> achievements = []; // Errungenschaften
+  // Statistiken
+  int questionsThisWeek = 0;
+  int currentStreak = 0;
+  int modulesCompleted = 0;
 
-  bool isLoading = false; // Ladezustand
-  String? error; // Fehlernachricht
+  // Listen & Status
+  List<LernenModule> lastModules = [];
+  Map<String, dynamic>? lastSession;
+  List<Map<String, dynamic>> achievements = [];
 
-  // Konstruktor lädt direkt die Home-Daten
-  HomeBackendProvider() {
+  bool isLoading = false;
+  String? error;
+
+  // Korrigierter Konstruktor
+  BackendProvider() {
     fetchHomeData();
   }
 
-  // Berechnung des Fortschritts einer Session
+  // Berechnung des Fortschritts
   double calculateProgress(Map<String, dynamic>? session) {
     if (session == null) return 0.0;
     final total = session['total_questions'] ?? 1;
     final correct = session['correct_answered'] ?? 0;
-    return (correct / total).clamp(0.0, 1.0);
+    return (correct / (total == 0 ? 1 : total)).clamp(0.0, 1.0);
   }
 
-  // File speichern
-  Future<void> setPicture() async {
-    if (_supabase.auth.currentUser == null || selectedImageFile == null) return;
+  // ... innerhalb deiner BackendProvider Klasse ...
 
-    final userId = _supabase.auth.currentUser!.id;
-    //isFileLoading = true;
+  Future<void> uploadAvatar(dynamic fileInput) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    isLoading = true;
     notifyListeners();
 
     try {
+      final userId = user.id;
       final filePath = 'user_$userId/avatar.png';
 
-      // Upload
-      final response = await _supabase.storage
-          .from('avatar_profile')
-          .upload(
-            filePath,
-            selectedImageFile!,
-            fileOptions: FileOptions(upsert: true),
-          );
-
-      if (response.isEmpty) {
-        throw 'Upload fehlgeschlagen';
+      if (kIsWeb) {
+        // WEB: fileInput MUSS Uint8List sein
+        await _supabase.storage
+            .from('avatar_profile')
+            .uploadBinary(
+              filePath,
+              fileInput as Uint8List,
+              fileOptions: const FileOptions(upsert: true),
+            );
+      } else {
+        // MOBILE: fileInput MUSS File sein
+        await _supabase.storage
+            .from('avatar_profile')
+            .upload(
+              filePath,
+              fileInput as File,
+              fileOptions: const FileOptions(upsert: true),
+            );
       }
 
-      // Public URL holen
       final publicUrl = _supabase.storage
           .from('avatar_profile')
           .getPublicUrl(filePath);
 
-      // URL in user_profile speichern
-      final updateRes = await _supabase
+      await _supabase
           .from('user_profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', userId);
 
-      if (updateRes.error != null) throw updateRes.error!;
+      avatarUrl = '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      // selectedImageFile setzen wir nur auf Mobile für die Vorschau
+      if (!kIsWeb) selectedImageFile = fileInput as File;
+
+      error = null;
     } catch (e) {
-      print('Fehler beim Setzen des Avatars: $e');
+      error = 'Upload fehlgeschlagen: $e';
+      print(error);
     } finally {
-      //isFileLoading = false;
+      isLoading = false;
       notifyListeners();
     }
   }
 
-  // File abrufen
-  Future<void> fetchPicture() async {
-    if (_supabase.auth.currentUser == null) return;
-
-    final userId = _supabase.auth.currentUser!.id;
+  // Avatar-URL abrufen
+  Future<void> fetchAvatarUrl() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
 
     try {
       final res = await _supabase
           .from('user_profiles')
           .select('avatar_url')
-          .eq('id', userId)
-          .single();
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (res.isNotEmpty && res['avatar_url'] != null) {
-        // Hier nur URL speichern
-        selectedImageFile = File(res['avatar_url']);
-        print('Avatar URL: ${res['avatar_url']}');
+      if (res != null && res['avatar_url'] != null) {
+        avatarUrl = res['avatar_url'];
+        // Nutze dies:
+        avatarUrl = '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}';
       }
     } catch (e) {
-      print('Fehler beim Abrufen des Avatars: $e');
+      print('Fehler beim Laden des Avatars: $e');
     }
-
     notifyListeners();
   }
 
-  // File löschen
+  // --- Datei löschen ---
   Future<void> deletePicture() async {
-    if (_supabase.auth.currentUser == null) return;
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
 
-    final userId = _supabase.auth.currentUser!.id;
-    //isFileLoading = true;
+    isLoading = true;
     notifyListeners();
 
     try {
+      final userId = user.id;
       final filePath = 'user_$userId/avatar.png';
 
-      // Datei im Storage löschen
-      await _supabase.storage.from('avatar_profile').remove([filePath]);
+      // 1. Datei aus dem Supabase Storage entfernen
+      // Wir ignorieren Fehler hier bewusst, falls die Datei bereits gelöscht wurde
+      try {
+        await _supabase.storage.from('avatar_profile').remove([filePath]);
+      } catch (storageError) {
+        print('Storage Info: Datei existierte evtl. nicht mehr: $storageError');
+      }
 
-      // URL in Tabelle leeren
+      // 2. Den Eintrag in der Datenbank auf null setzen
       await _supabase
           .from('user_profiles')
           .update({'avatar_url': null})
           .eq('id', userId);
 
+      // 3. Lokale States zurücksetzen
+      avatarUrl = null;
       selectedImageFile = null;
     } catch (e) {
-      print('Fehler beim Löschen des Avatars: $e');
+      error = 'Fehler beim Löschen des Avatars: $e';
+      print(error);
     } finally {
-      //isFileLoading = false;
+      isLoading = false;
       notifyListeners();
     }
   }
 
-  // --- Daten für Home Screen abrufen ---
+  // Home Daten laden
   Future<void> fetchHomeData() async {
     isLoading = true;
     error = null;
     notifyListeners();
 
     try {
-      // --- Aktuellen Benutzer abrufen ---
-      // --- Aktuellen Benutzer abrufen (Session aktualisieren) ---
       final user = _supabase.auth.currentUser;
-
       if (user != null) {
-        final myFullName = user.userMetadata?['full_name'];
-        final myname = user.userMetadata?['username'];
+        final myFullName = user.userMetadata?['full_name'] ?? '';
+        final myName = user.userMetadata?['username'];
 
-        userName = (myname != null && myname.isNotEmpty)
-            ? myname
+        userName = (myName != null && myName.isNotEmpty)
+            ? myName
             : user.email?.split('@').first.capitalize() ?? 'User';
 
         fullName = myFullName;
+        email = user.email ?? '';
 
-        email = user.email!;
-        userInitials = fullName
-            .split(' ')
-            .where((e) => e.isNotEmpty)
-            .map((e) => e[0])
-            .take(2)
-            .join()
-            .toUpperCase();
+        userInitials = fullName.isNotEmpty
+            ? fullName
+                  .split(' ')
+                  .where((e) => e.isNotEmpty)
+                  .map((e) => e[0])
+                  .take(2)
+                  .join()
+                  .toUpperCase()
+            : userName
+                  .substring(0, (userName.length >= 2 ? 2 : userName.length))
+                  .toUpperCase();
       }
 
-      // --- Letzte Session abrufen ---
-      final sessions =
-          await _supabase
-                  .from('learning_sessions')
-                  .select()
-                  .order('created_at', ascending: false)
-                  .limit(1)
-              as List<dynamic>;
+      // Letzte Session
+      final sessions = await _supabase
+          .from('learning_sessions')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(1);
 
-      if (sessions.isNotEmpty) {
+      if (sessions is List && sessions.isNotEmpty) {
         lastSession = sessions.first as Map<String, dynamic>;
+        questionsThisWeek = lastSession?['total_questions'] ?? 0;
       }
 
-      // --- Letzte Module abrufen ---
+      // Letzte Module
       final modules =
           await _supabase.from('modules').select('*').limit(3) as List<dynamic>;
 
@@ -200,19 +216,16 @@ class BackendProvider with ChangeNotifier {
           .map((e) => LernenModule.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      // --- Statistiken setzen ---
-      questionsThisWeek = lastSession?['total_questions'] ?? 0;
-      modulesCompleted = 5; // TODO: aus Datenbank berechnen
-      currentStreak = 7; // TODO: aus Datenbank berechnen
-
-      // --- Errungenschaften setzen ---
+      // Dummy-Daten (müssen später durch echte Abfragen ersetzt werden)
+      modulesCompleted = 5;
+      currentStreak = 7;
       achievements = [
         {'title': 'First Step', 'earned': true},
         {'title': 'Quiz Master', 'earned': false},
       ];
     } catch (e) {
-      error = 'Konnte Home-Daten nicht laden: $e';
-      print(error);
+      error = 'Daten konnten nicht geladen werden.';
+      print('Fehler: $e');
     } finally {
       isLoading = false;
       notifyListeners();
@@ -237,181 +250,5 @@ class BackendProvider with ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
-  }
-}
-
-// --- Home Screen ---
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  // --- StatCard Widget ---
-  Widget _buildStatCard({
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: AppColors.appHeaderBackgroundGradient,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryColorDark.withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 28),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => BackendProvider(),
-      child: Consumer<BackendProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (provider.error != null) {
-            return Scaffold(body: Center(child: Text(provider.error!)));
-          }
-
-          return Scaffold(
-            backgroundColor: Colors.black,
-            body: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // --- Begrüßung mit vollständigem Namen ---
-                        Text(
-                          'Welcome, ${provider.userName}!',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Education is the passport to the future!',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildStatCard(
-                          icon: Icons.my_location_outlined,
-                          value: provider.questionsThisWeek.toString(),
-                          label: 'Questions this week',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.watch_later_outlined,
-                          value: '${provider.currentStreak} days',
-                          label: 'Current streak',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.workspace_premium_outlined,
-                          value: '${provider.modulesCompleted}/12',
-                          label: 'Modules completed',
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Continue where you left off',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        for (var module in provider.lastModules)
-                          QuizCard(
-                            moduleTitle: module.name,
-                            moduleDescription: module.description ?? '',
-                            progress: provider.calculateProgress(
-                              provider.lastSession,
-                            ),
-                            onResume: () {},
-                          ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Quick Actions',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        CategoryCard(
-                          icon: Icons.stacked_bar_chart,
-                          title: 'Browse Modules',
-                          subtitle: 'View all modules',
-                          iconColor: Colors.blue,
-                          onTap: () {
-                            Navigator.pushNamed(context, '/modules');
-                          },
-                        ),
-                        CategoryCard(
-                          icon: Icons.emoji_events_outlined,
-                          title: 'Achievements',
-                          subtitle: 'View your badges and rewards',
-                          iconColor: Colors.orange,
-                          onTap: () {},
-                        ),
-                        CategoryCard(
-                          icon: Icons.trending_up,
-                          title: 'Statistics',
-                          subtitle: 'Track your progress',
-                          iconColor: Colors.green,
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 }
