@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:mc_trainer_kami/models/lernen_module.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Avatar hochladen
 import 'package:flutter/foundation.dart'; // Für kIsWeb
+import 'package:mc_trainer_kami/models/achievement_data.dart';
 
 // Extension zur Großschreibung von Strings
 extension StringCasingExtension on String {
@@ -20,6 +22,7 @@ class BackendProvider with ChangeNotifier {
   String fullName = '';
   String email = '';
   String userInitials = '';
+  int achievedPoint = 1;
 
   // Statistiken
   int questionsThisWeek = 0;
@@ -29,11 +32,26 @@ class BackendProvider with ChangeNotifier {
   // Listen & Status
   List<LernenModule> lastModules = [];
   Map<String, dynamic>? lastSession;
-  List<Map<String, dynamic>> achievements = [];
+  List<Achievement> myAchievements = [];
 
   bool isLoading = false;
   String? error;
 
+  // Icons und Farben für Achievements
+  List<IconData> achievementsIcon = [
+    Icons.bolt,
+    Icons.calendar_today,
+    Icons.star,
+    Icons.auto_awesome,
+    Icons.wb_sunny,
+  ];
+  List<Color> achievementsColor = [
+    Colors.amber,
+    Colors.blue,
+    Colors.purple,
+    Colors.green,
+    Colors.orange,
+  ];
   // Korrigierter Konstruktor
   BackendProvider() {
     fetchHomeData();
@@ -219,12 +237,68 @@ class BackendProvider with ChangeNotifier {
       // Dummy-Daten (müssen später durch echte Abfragen ersetzt werden)
       modulesCompleted = 5;
       currentStreak = 7;
-      achievements = [
-        {'title': 'First Step', 'earned': true},
-        {'title': 'Quiz Master', 'earned': false},
-      ];
     } catch (e) {
       error = 'Daten konnten nicht geladen werden.';
+      print('Fehler: $e');
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+    fetchAchievementsData();
+  }
+
+  Future<void> fetchAchievementsData() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final user = _supabase.auth.currentUser;
+
+      // Letzte Module
+      final achievements = await _supabase
+          .from('achievements')
+          .select()
+          .order('id', ascending: true);
+
+      final achieved = await _supabase
+          .from('user_achievements')
+          .select('achievement_id, unlocked_at')
+          .eq('user_id', user!.id)
+          .order('id', ascending: true);
+
+      final achievedMap = {
+        for (final a in achieved)
+          a['achievement_id'] as int: a['unlocked_at'] != null
+              ? DateTime.parse(a['unlocked_at'])
+              : null,
+      };
+
+      myAchievements.clear();
+
+      achievements.forEach((e) {
+        final achievementId = e['id'] as int;
+        final unlockedDate = achievedMap[achievementId];
+
+        myAchievements.add(
+          Achievement(
+            id: e['id'],
+            title: e['title'],
+            description: e['description'],
+            icon: achievementsIcon[achievementId - 1],
+            color: achievementsColor[achievementId - 1],
+            isUnlocked: unlockedDate != null,
+            unlockedDate: unlockedDate,
+            points: e['awarded_points'],
+          ),
+        );
+      });
+
+      print('test 1:' + achievements.length.toString());
+      print('test 2:' + myAchievements.length.toString());
+      print('\n It is just a second test ' + achieved[0].toString() + '\n');
+    } catch (e) {
+      error = 'Diese Daten konnten nicht geladen werden.';
       print('Fehler: $e');
     } finally {
       isLoading = false;
