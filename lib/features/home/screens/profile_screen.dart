@@ -37,6 +37,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfileData();
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendProvider>().fetchAvatarUrl();
+    });
   }
 
   void _loadProfileData() {
@@ -48,9 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.text = provider.profileName;
     _emailController.text = provider.profileEmail;
     _usernameController.text = provider.profileUsername;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BackendProvider>().fetchAvatarUrl();
-    });
   }
 
   void _toggleEditMode() {
