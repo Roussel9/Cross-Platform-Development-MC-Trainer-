@@ -43,7 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // WICHTIG: Provider Daten neu laden
       final provider = Provider.of<BackendProvider>(context, listen: false);
-      await provider.fetchHomeData(); // Oder provider.reset() und dann fetchHomeData()
+      await provider
+          .fetchHomeData(); // Oder provider.reset() und dann fetchHomeData()
 
       setState(() {
         _isLoading = false;
@@ -57,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Zur Home-Seite navigieren
         Navigator.pushReplacementNamed(context, '/home');
       }
@@ -67,13 +68,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (e.message.contains('Username')) {
         errorMessage = 'Username was not found';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -81,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -92,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
-  
+
   // PASSWORT ZURÜCKSETZEN
   Future<void> _handleForgotPassword() async {
     if (_emailController.text.isEmpty || !_emailController.text.contains('@')) {
@@ -104,10 +102,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
-    
+
     try {
       await _authService.resetPassword(_emailController.text.trim());
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

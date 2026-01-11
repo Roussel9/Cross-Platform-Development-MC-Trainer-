@@ -107,7 +107,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (emailChanged) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Email wurde SOFORT geändert auf: ${_emailController.text}'),
+            content: Text(
+              'Email wurde SOFORT geändert auf: ${_emailController.text}',
+            ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 4),
           ),
@@ -129,7 +131,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
   }
-
 
   // Abmelde-Funktion mit Bestätigungsdialog
   Future<void> _showLogoutDialog() async {
@@ -303,10 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             appBar: AppBar(
               title: const Text(
                 'Profil',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
               ),
               centerTitle: true,
               elevation: 0,
@@ -393,10 +391,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: imageProvider == null
                       ? Icon(
-                    Icons.person,
-                    size: isSmallScreen ? 30 : 40,
-                    color: Colors.white,
-                  )
+                          Icons.person,
+                          size: isSmallScreen ? 30 : 40,
+                          color: Colors.white,
+                        )
                       : null,
                 ),
                 // Stift-Icon hinzufügen
@@ -553,7 +551,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLearningStatsSection(BackendProvider provider, bool isSmallScreen) {
+  Widget _buildLearningStatsSection(
+    BackendProvider provider,
+    bool isSmallScreen,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -634,11 +635,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: valueColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 10),
           ),
-          child: Icon(
-            icon,
-            color: valueColor,
-            size: isSmallScreen ? 20 : 24,
-          ),
+          child: Icon(icon, color: valueColor, size: isSmallScreen ? 20 : 24),
         ),
         SizedBox(width: isSmallScreen ? 12 : 16),
         Expanded(
@@ -670,7 +667,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildPersonalInfoSection(BackendProvider provider, bool isSmallScreen) {
+  Widget _buildPersonalInfoSection(
+    BackendProvider provider,
+    bool isSmallScreen,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -801,7 +801,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: isEditing ? Colors.white : Colors.grey[50],
             borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 12),
             border: Border.all(
-              color: isEditing ? AppColors.primaryColorLight : const Color(0xFFE0E0E0),
+              color: isEditing
+                  ? AppColors.primaryColorLight
+                  : const Color(0xFFE0E0E0),
             ),
           ),
           child: Row(
@@ -809,28 +811,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: isEditing
                     ? TextFormField(
-                  controller: controller,
-                  style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: isSmallScreen ? 10 : 12,
-                    ),
-                  ),
-                  keyboardType: keyboardType,
-                )
+                        controller: controller,
+                        style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: isSmallScreen ? 10 : 12,
+                          ),
+                        ),
+                        keyboardType: keyboardType,
+                      )
                     : Padding(
-                  padding: EdgeInsets.symmetric(
-                    vertical: isSmallScreen ? 10 : 12,
-                  ),
-                  child: Text(
-                    controller.text.isNotEmpty ? controller.text : 'Nicht gesetzt',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: controller.text.isNotEmpty ? Colors.black87 : Colors.grey,
-                    ),
-                  ),
-                ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isSmallScreen ? 10 : 12,
+                        ),
+                        child: Text(
+                          controller.text.isNotEmpty
+                              ? controller.text
+                              : 'Nicht gesetzt',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 14 : 16,
+                            color: controller.text.isNotEmpty
+                                ? Colors.black87
+                                : Colors.grey,
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -847,9 +853,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _cancelEditing,
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: AppColors.primaryColorLight),
-              padding: EdgeInsets.symmetric(
-                vertical: isSmallScreen ? 12 : 16,
-              ),
+              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 12),
               ),

@@ -1,11 +1,12 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';  // Fügt kDebugMode hinzu
+import 'package:flutter/foundation.dart'; // Fügt kDebugMode hinzu
 import 'package:flutter/material.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/constants/app_strings.dart';
 import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/models/lernen_module.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Avatar hochladen
 import 'package:flutter/foundation.dart'; // Für kIsWeb
@@ -21,8 +22,8 @@ extension StringCasingExtension on String {
 class BackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  String userName = '';       // Vollständiger Name des Benutzers
-  String userInitials = '';         // Initialen für Avatar
+  String userName = ''; // Vollständiger Name des Benutzers
+  String userInitials = ''; // Initialen für Avatar
   String? avatarUrl = '';
   File? selectedImageFile; // Lokale Datei für den Upload
   String fullName = '';
@@ -49,8 +50,8 @@ class BackendProvider with ChangeNotifier {
   double averageScore = 0.0;
   int totalQuestions = 0;
 
-  bool isLoading = false;           // Ladezustand
-  String? error;                    // Fehlernachricht
+  bool isLoading = false; // Ladezustand
+  String? error; // Fehlernachricht
 
   // Icons und Farben für Achievements
   List<IconData> achievementsIcon = [
@@ -268,11 +269,13 @@ class BackendProvider with ChangeNotifier {
       }
 
       // --- Letzte Session abrufen ---
-      final sessions = await _supabase
-          .from('learning_sessions')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(1) as List<dynamic>;
+      final sessions =
+          await _supabase
+                  .from('learning_sessions')
+                  .select()
+                  .order('created_at', ascending: false)
+                  .limit(1)
+              as List<dynamic>;
 
       if (sessions is List && sessions.isNotEmpty) {
         lastSession = sessions.first as Map<String, dynamic>;
@@ -280,10 +283,8 @@ class BackendProvider with ChangeNotifier {
       }
 
       // --- Letzte Module abrufen ---
-      final modules = await _supabase
-          .from('modules')
-          .select('*')
-          .limit(3) as List<dynamic>;
+      final modules =
+          await _supabase.from('modules').select('*').limit(3) as List<dynamic>;
 
       lastModules = modules
           .map((e) => LernenModule.fromJson(e as Map<String, dynamic>))
@@ -294,7 +295,7 @@ class BackendProvider with ChangeNotifier {
       // Module aus user_statistics berechnen
       await _calculateUserStatistics();
       //modulesCompleted = 5; // TODO: aus Datenbank berechnen
-      currentStreak = 7;    // TODO: aus Datenbank berechnen
+      currentStreak = 7; // TODO: aus Datenbank berechnen
       // Dummy-Daten (müssen später durch echte Abfragen ersetzt werden)
       currentStreak = 7;
     } catch (e) {
@@ -385,9 +386,9 @@ class BackendProvider with ChangeNotifier {
           .eq('id', user.id)
           .maybeSingle()
           .catchError((e) {
-        print('⚠️ Kein Profil in user_profiles gefunden: $e');
-        return null;
-      });
+            print('⚠️ Kein Profil in user_profiles gefunden: $e');
+            return null;
+          });
 
       print('📊 Profil Response: $profileResponse');
 
@@ -402,7 +403,8 @@ class BackendProvider with ChangeNotifier {
         if (createdAt != null) {
           final date = DateTime.tryParse(createdAt);
           if (date != null) {
-            profileCreatedAt = 'Mitglied seit ${date.day}.${date.month}.${date.year}';
+            profileCreatedAt =
+                'Mitglied seit ${date.day}.${date.month}.${date.year}';
           }
         }
 
@@ -435,7 +437,6 @@ class BackendProvider with ChangeNotifier {
       await _calculateProfileStatistics(user.id);
 
       print('✅ Profildaten erfolgreich geladen');
-
     } catch (e) {
       print('❌ FEHLER beim Laden der Profildaten: $e');
       print('Stacktrace: ${e.toString()}');
@@ -464,8 +465,10 @@ class BackendProvider with ChangeNotifier {
         for (var session in sessionsResponse) {
           totalQuestions += (session['total_questions'] as int?) ?? 0;
           correctAnswers += (session['correct_answered'] as int?) ?? 0;
-          final durationMinutes = (session['timer_duration_minutes'] as int?) ?? 0;
-          totalDuration += durationMinutes * 60; // Minuten zu Sekunden umrechnen
+          final durationMinutes =
+              (session['timer_duration_minutes'] as int?) ?? 0;
+          totalDuration +=
+              durationMinutes * 60; // Minuten zu Sekunden umrechnen
         }
 
         this.totalQuestions = totalQuestions;
@@ -484,19 +487,19 @@ class BackendProvider with ChangeNotifier {
             .single();
 
         if (statisticsResponse != null) {
-          modulesCompleted = (statisticsResponse['modules_completed'] as int?) ?? 0;
+          modulesCompleted =
+              (statisticsResponse['modules_completed'] as int?) ?? 0;
         }
       } catch (e) {
         print('Keine user_statistics für User $userId gefunden: $e');
         modulesCompleted = 0;
       }
-
     } catch (e) {
       print('Fehler beim Berechnen der Profil-Statistiken: $e');
     }
   }
 
-// NEU: Statistiken für HomeScreen berechnen
+  // NEU: Statistiken für HomeScreen berechnen
   Future<void> _calculateUserStatistics() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -506,13 +509,17 @@ class BackendProvider with ChangeNotifier {
       try {
         final statisticsResponse = await _supabase
             .from('user_statistics')
-            .select('modules_completed, questions_answered_this_week, current_streak')
+            .select(
+              'modules_completed, questions_answered_this_week, current_streak',
+            )
             .eq('user_id', user.id)
             .single();
 
         if (statisticsResponse != null) {
-          modulesCompleted = (statisticsResponse['modules_completed'] as int?) ?? 0;
-          questionsThisWeek = (statisticsResponse['questions_answered_this_week'] as int?) ?? 0;
+          modulesCompleted =
+              (statisticsResponse['modules_completed'] as int?) ?? 0;
+          questionsThisWeek =
+              (statisticsResponse['questions_answered_this_week'] as int?) ?? 0;
           currentStreak = (statisticsResponse['current_streak'] as int?) ?? 0;
         }
       } catch (e) {
@@ -601,13 +608,10 @@ class BackendProvider with ChangeNotifier {
         print('🔄 Aktualisiere Auth-Email von $originalAuthEmail zu $email');
         try {
           // Direkte Email-Änderung (funktioniert weil "Confirm email change" OFF ist)
-          await _supabase.auth.updateUser(
-            UserAttributes(email: email),
-          );
+          await _supabase.auth.updateUser(UserAttributes(email: email));
           print('✅ Auth-Email SOFORT geändert auf: $email');
 
           // Keine Verifizierungs-Email wird gesendet!
-
         } catch (authError) {
           print('⚠️ Auth-Email Update fehlgeschlagen: $authError');
 
@@ -628,7 +632,13 @@ class BackendProvider with ChangeNotifier {
       profileUsername = username;
       userName = name;
       userInitials = name.isNotEmpty
-          ? name.split(' ').where((e) => e.isNotEmpty).map((e) => e[0]).take(2).join().toUpperCase()
+          ? name
+                .split(' ')
+                .where((e) => e.isNotEmpty)
+                .map((e) => e[0])
+                .take(2)
+                .join()
+                .toUpperCase()
           : 'U';
 
       // 4. Benachrichtigen
@@ -636,12 +646,13 @@ class BackendProvider with ChangeNotifier {
 
       // 5. Erfolgreiche Aktualisierung melden
       print('✅ UpdateProfile erfolgreich abgeschlossen');
-      print(emailChanged
-          ? '📧 Email wurde SOFORT geändert auf: $email'
-          : '✅ Nur Name/Username aktualisiert');
+      print(
+        emailChanged
+            ? '📧 Email wurde SOFORT geändert auf: $email'
+            : '✅ Nur Name/Username aktualisiert',
+      );
 
       return true;
-
     } catch (e) {
       print('❌ UNBEKANNTER FEHLER: $e');
       print('Stacktrace: ${e.toString()}');
@@ -655,9 +666,8 @@ class BackendProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final modules = await _supabase
-          .from('modules')
-          .select('*') as List<dynamic>;
+      final modules =
+          await _supabase.from('modules').select('*') as List<dynamic>;
 
       lastModules = modules
           .map((e) => LernenModule.fromJson(e as Map<String, dynamic>))
@@ -672,7 +682,7 @@ class BackendProvider with ChangeNotifier {
 
   // In BackendProvider Klasse fügen Sie diese Methoden hinzu:
 
-// Reset-Methode
+  // Reset-Methode
   void reset() {
     userName = '';
     userInitials = '';
@@ -698,12 +708,10 @@ class BackendProvider with ChangeNotifier {
     notifyListeners();
   }
 
-// Optional: Clear-Methode für Logout
+  // Optional: Clear-Methode für Logout
   void clearData() {
     reset();
   }
-
-
 }
 
 // --- Home Screen ---
@@ -773,9 +781,7 @@ class HomeScreen extends StatelessWidget {
           }
 
           if (provider.error != null) {
-            return Scaffold(
-              body: Center(child: Text(provider.error!)),
-            );
+            return Scaffold(body: Center(child: Text(provider.error!)));
           }
 
           return Scaffold(
@@ -790,11 +796,14 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // --- Begrüßung mit vollständigem Namen ---
-                        Text('Welcome back, ${provider.userName}!',
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        Text(
+                          'Welcome back, ${provider.userName}!',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           'Education is the passport to the future!',
@@ -817,26 +826,33 @@ class HomeScreen extends StatelessWidget {
                           label: 'Modules completed',
                         ),
                         const SizedBox(height: 24),
-                        const Text('Continue where you left off',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        const Text(
+                          'Continue where you left off',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         for (var module in provider.lastModules)
                           QuizCard(
                             moduleTitle: module.name,
                             moduleDescription: module.description ?? '',
-                            progress:
-                            provider.calculateProgress(provider.lastSession),
+                            progress: provider.calculateProgress(
+                              provider.lastSession,
+                            ),
                             onResume: () {},
                           ),
                         const SizedBox(height: 24),
-                        const Text('Quick Actions',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        const Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         CategoryCard(
                           icon: Icons.stacked_bar_chart,
