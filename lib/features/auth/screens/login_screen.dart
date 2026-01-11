@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
+import 'package:mc_trainer_kami/provider/backend_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // In login_screen.dart nach erfolgreichem Login:
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -35,26 +38,27 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // SUPABASE LOGIN
       await _authService.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      
+
+      // WICHTIG: Provider Daten neu laden
+      final provider = Provider.of<BackendProvider>(context, listen: false);
+      await provider.fetchHomeData(); // Oder provider.reset() und dann fetchHomeData()
+
       setState(() {
         _isLoading = false;
       });
 
       if (mounted) {
-        // Erfolgreicher Login
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login successful!'),
             backgroundColor: Colors.green,
           ),
         );
-        
-        // Zur Home-Seite navigieren
+
         Navigator.pushReplacementNamed(context, '/home');
       }
     } on AuthException catch (e) {
