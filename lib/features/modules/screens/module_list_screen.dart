@@ -468,20 +468,6 @@ class _ModuleCardState extends State<ModuleCard> {
               ),
             ),
           ),
-
-          // --- EXPANDABLE BODY (Aufklappbarer Bereich bei Hover) ---
-          if (hasLessons && isExpanded)
-            Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: widget.module.lessons.map((lesson) {
-                  return LessonTile(
-                    lesson: lesson,
-                  ); // Verwenden der lokalen LessonTile
-                }).toList(),
-              ),
-            ),
         ],
       ),
     );

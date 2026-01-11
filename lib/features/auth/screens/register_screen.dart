@@ -19,7 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _acceptTerms = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
-  
+
   final AuthService _authService = AuthService();
 
   @override
@@ -60,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         lastName: _lastNameController.text.trim(),
         username: _usernameController.text.trim(),
       );
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -75,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               duration: Duration(seconds: 5),
             ),
           );
-          
+
           // Zur Login-Seite navigieren
           Navigator.pushReplacementNamed(context, '/login');
         }
@@ -85,7 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       String errorMessage = 'Registration failed';
       if (e.message.contains('User already registered')) {
         errorMessage = 'This email is already registered';
@@ -94,13 +94,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       } else if (e.message.contains('email')) {
         errorMessage = 'Invalid email format';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -108,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -326,50 +323,88 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Terms and Conditions Checkbox
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: _acceptTerms,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _acceptTerms = value ?? false;
-                                  });
-                                },
-                              ),
-                              Expanded(
-                                child: Wrap(
-                                  children: [
-                                    const Text('I accept the '),
-                                    GestureDetector(
-                                      onTap: () {
-                                        // TODO: Öffne Terms and Conditions
-                                      },
-                                      child: const Text(
-                                        'Terms and Conditions',
+                          // Ersetze den "Terms and Conditions Checkbox" Bereich mit diesem Code:
+                          FormField<bool>(
+                            initialValue: _acceptTerms,
+                            validator: (value) {
+                              if (value == false || value == null) {
+                                return 'You must accept the terms and conditions';
+                              }
+                              return null;
+                            },
+                            builder: (state) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Checkbox(
+                                        value: state.value,
+                                        onChanged: (value) {
+                                          state.didChange(
+                                            value,
+                                          ); // Validiert das Feld sofort
+                                          setState(() {
+                                            _acceptTerms = value ?? false;
+                                          });
+                                        },
+                                      ),
+                                      Expanded(
+                                        child: Wrap(
+                                          children: [
+                                            const Text('I accept the '),
+                                            GestureDetector(
+                                              onTap: () {
+                                                /* TODO: Terms */
+                                              },
+                                              child: const Text(
+                                                'Terms and Conditions',
+                                                style: TextStyle(
+                                                  color: Colors.blue,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                ),
+                                              ),
+                                            ),
+                                            const Text(' and '),
+                                            GestureDetector(
+                                              onTap: () {
+                                                /* TODO: Privacy */
+                                              },
+                                              child: const Text(
+                                                'Privacy Policy',
+                                                style: TextStyle(
+                                                  color: Colors.blue,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // Fehlermeldung anzeigen, wenn die Validierung fehlschlägt
+                                  if (state.hasError)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        left: 12,
+                                        top: 4,
+                                      ),
+                                      child: Text(
+                                        state.errorText ?? '',
                                         style: TextStyle(
-                                          color: Colors.blue,
-                                          decoration: TextDecoration.underline,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                          fontSize: 12,
                                         ),
                                       ),
                                     ),
-                                    const Text(' and '),
-                                    GestureDetector(
-                                      onTap: () {
-                                        // TODO: Öffne Privacy Policy
-                                      },
-                                      child: const Text(
-                                        'Privacy Policy',
-                                        style: TextStyle(
-                                          color: Colors.blue,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                                ],
+                              );
+                            },
                           ),
                           const SizedBox(height: 24),
 

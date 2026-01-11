@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/theme/app_theme.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
 import 'package:mc_trainer_kami/features/auth/services/auth_service.dart';
+import 'package:mc_trainer_kami/provider/backend_provider.dart';
+import 'package:flutter/foundation.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,8 +23,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _usernameController;
 
-  // Für Bildauswahl
-  File? _selectedImageFile;
   final ImagePicker _picker = ImagePicker();
   bool _isSaving = false;
 
@@ -47,6 +48,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.text = provider.profileName;
     _emailController.text = provider.profileEmail;
     _usernameController.text = provider.profileUsername;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendProvider>().fetchAvatarUrl();
+    });
   }
 
   void _toggleEditMode() {
@@ -179,9 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  // Echte Bildauswahl mit image_picker
   Future<void> _selectProfileImage() async {
-    // Zeige Auswahl-Dialog (Kamera oder Galerie)
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -190,24 +192,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                GestureDetector(
-                  child: const ListTile(
-                    leading: Icon(Icons.photo_library),
-                    title: Text('Aus Galerie auswählen'),
-                  ),
-                  onTap: () async {
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Aus Galerie auswählen'),
+                  onTap: () {
                     Navigator.pop(context);
-                    await _pickImageFromGallery();
+                    _pickImage(ImageSource.gallery);
                   },
                 ),
-                GestureDetector(
-                  child: const ListTile(
-                    leading: Icon(Icons.camera_alt),
-                    title: Text('Foto aufnehmen'),
-                  ),
-                  onTap: () async {
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('Foto aufnehmen'),
+                  onTap: () {
                     Navigator.pop(context);
-                    await _pickImageFromCamera();
+                    _pickImage(ImageSource.camera);
                   },
                 ),
               ],
@@ -218,61 +216,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _pickImageFromGallery() async {
+  Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
+        source: source,
+        maxWidth: 500,
+        maxHeight: 500,
         imageQuality: 85,
       );
 
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profilbild ausgewählt'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (pickedFile != null && mounted) {
+        final backend = context.read<BackendProvider>();
+
+        if (kIsWeb) {
+          // Für WEB: Wir lesen die Bytes aus dem XFile
+          final Uint8List imageBytes = await pickedFile.readAsBytes();
+          await backend.uploadAvatar(imageBytes);
+        } else {
+          // Für MOBILE: Wir übergeben das File Objekt
+          await backend.uploadAvatar(File(pickedFile.path));
+        }
+
+        if (mounted && backend.error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profilbild aktualisiert'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (backend.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(backend.error!),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print("Picker Error: $e");
     }
   }
 
-  Future<void> _pickImageFromCamera() async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Foto aufgenommen'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
+  Future<void> _deleteProfileImage() async {
+    final backend = context.read<BackendProvider>();
+    await backend.deletePicture();
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler: $e'),
-          backgroundColor: Colors.red,
+        const SnackBar(
+          content: Text('Profilbild gelöscht'),
+          backgroundColor: Colors.green,
         ),
       );
     }
@@ -351,6 +344,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader(BackendProvider provider, bool isSmallScreen) {
+    // Entscheiden, welches Bild angezeigt wird:
+    // 1. Priorität: Das gerade lokal ausgewählte File (noch im Upload)
+    // 2. Priorität: Die URL aus Supabase
+    BackendProvider backend = provider;
+    ImageProvider? imageProvider;
+    if (backend.selectedImageFile != null) {
+      imageProvider = FileImage(backend.selectedImageFile!);
+    } else if (backend.avatarUrl != null) {
+      imageProvider = NetworkImage(backend.avatarUrl!);
+    }
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
       decoration: BoxDecoration(
@@ -381,15 +384,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.white,
                       width: isSmallScreen ? 2 : 3,
                     ),
-                    // Optional: Wenn du später Profilbilder hast
-                    image: _selectedImageFile != null
+                    image: imageProvider != null
                         ? DecorationImage(
-                      image: FileImage(_selectedImageFile!),
-                      fit: BoxFit.cover,
-                    )
+                            image: imageProvider,
+                            fit: BoxFit.cover,
+                          )
                         : null,
                   ),
-                  child: _selectedImageFile == null
+                  child: imageProvider == null
                       ? Icon(
                     Icons.person,
                     size: isSmallScreen ? 30 : 40,
@@ -418,6 +420,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
+                // Delete Button erscheint nur, wenn ein Bild existiert
+                if (backend.avatarUrl != null ||
+                    backend.selectedImageFile != null)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _deleteProfileImage,
+                      child: Container(
+                        padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          size: isSmallScreen ? 12 : 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -428,6 +453,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Name
                 Text(
                   provider.profileName.isNotEmpty
                       ? provider.profileName
@@ -532,7 +558,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(left: 4.0, bottom: isSmallScreen ? 8 : 12),
+          padding: EdgeInsets.only(
+            left: isSmallScreen ? 4.0 : 8.0,
+            bottom: isSmallScreen ? 8 : 12,
+          ),
           child: Text(
             'Lernstatistiken',
             style: TextStyle(
@@ -542,7 +571,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
-
         Container(
           padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
           decoration: BoxDecoration(
@@ -558,6 +586,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           child: Column(
             children: [
+              // Gelernte Stunden
               _buildStatRow(
                 icon: Icons.timer_outlined,
                 label: 'Gelernte Stunden',
@@ -646,7 +675,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(left: 4.0, bottom: isSmallScreen ? 8 : 12),
+          padding: EdgeInsets.only(
+            left: isSmallScreen ? 4.0 : 8.0,
+            bottom: isSmallScreen ? 8 : 12,
+          ),
           child: Text(
             'Persönliche Informationen',
             style: TextStyle(
@@ -684,20 +716,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryColorDark,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  SizedBox(width: isSmallScreen ? 8 : 12),
                   TextButton.icon(
                     onPressed: _toggleEditMode,
                     icon: Icon(
                       _isEditing ? Icons.close : Icons.edit,
                       size: isSmallScreen ? 14 : 18,
-                      color: AppColors.primaryColorLight,
+                      color: _isEditing
+                          ? Colors.grey
+                          : AppColors.primaryColorLight,
                     ),
                     label: Text(
                       _isEditing ? 'Abbrechen' : 'Bearbeiten',
                       style: TextStyle(
                         fontSize: isSmallScreen ? 12 : 14,
-                        color: AppColors.primaryColorLight,
+                        color: _isEditing
+                            ? Colors.grey
+                            : AppColors.primaryColorLight,
                       ),
                     ),
                   ),
@@ -808,7 +847,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _cancelEditing,
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: AppColors.primaryColorLight),
-              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 16),
+              padding: EdgeInsets.symmetric(
+                vertical: isSmallScreen ? 12 : 16,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(isSmallScreen ? 8 : 12),
               ),
