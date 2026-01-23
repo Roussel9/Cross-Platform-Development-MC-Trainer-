@@ -51,8 +51,8 @@ class BackendProvider with ChangeNotifier {
   double averageScore = 0.0;
   int totalQuestions = 0;
 
-  bool isLoading = false;           // Ladezustand
-  String? error;                    // Fehlernachricht
+  bool isLoading = false; // Ladezustand
+  String? error; // Fehlernachricht
 
   // Icons und Farben für Achievements
   List<IconData> achievementsIcon = [
@@ -289,11 +289,13 @@ class BackendProvider with ChangeNotifier {
       }
 
       // --- Letzte Session abrufen ---
-      final sessions = await _supabase
-          .from('learning_sessions')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(1) as List<dynamic>;
+      final sessions =
+          await _supabase
+                  .from('learning_sessions')
+                  .select()
+                  .order('created_at', ascending: false)
+                  .limit(1)
+              as List<dynamic>;
 
       if (sessions.isNotEmpty) {
         lastSession = sessions.first as Map<String, dynamic>;
@@ -456,6 +458,218 @@ class BackendProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> _calculateProfileStatistics(String userId) async {
+    try {
+      // Aus learning_sessions: Gelernte Stunden und Fragen
+      final sessionsResponse = await _supabase
+          .from('learning_sessions')
+          .select('total_questions, correct_answered, timer_duration_minutes')
+          .eq('user_id', userId);
+
+      if (sessionsResponse.isNotEmpty) {
+        int totalQuestions = 0;
+        int correctAnswers = 0;
+        int totalDuration = 0;
+
+        for (var session in sessionsResponse) {
+          totalQuestions += (session['total_questions'] as int?) ?? 0;
+          correctAnswers += (session['correct_answered'] as int?) ?? 0;
+          final durationMinutes =
+              (session['timer_duration_minutes'] as int?) ?? 0;
+          totalDuration +=
+              durationMinutes * 60; // Minuten zu Sekunden umrechnen
+        }
+
+        this.totalQuestions = totalQuestions;
+        learnedHours = (totalDuration / 3600).round(); // Sekunden zu Stunden
+        averageScore = totalQuestions > 0
+            ? (correctAnswers / totalQuestions * 100)
+            : 0.0;
+      }
+
+      // Abgeschlossene Module aus user_statistics
+      try {
+        final statisticsResponse = await _supabase
+            .from('user_statistics')
+            .select('modules_completed')
+            .eq('user_id', userId)
+            .single();
+
+        if (statisticsResponse != null) {
+          modulesCompleted =
+              (statisticsResponse['modules_completed'] as int?) ?? 0;
+        }
+      } catch (e) {
+        print('Keine user_statistics für User $userId gefunden: $e');
+        modulesCompleted = 0;
+      }
+    } catch (e) {
+      print('Fehler beim Berechnen der Profil-Statistiken: $e');
+    }
+  }
+
+  // NEU: Statistiken für HomeScreen berechnen
+  Future<void> _calculateUserStatistics() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      // Aus user_statistics Tabelle
+      try {
+        final statisticsResponse = await _supabase
+            .from('user_statistics')
+            .select(
+              'modules_completed, questions_answered_this_week, current_streak',
+            )
+            .eq('user_id', user.id)
+            .single();
+
+        if (statisticsResponse != null) {
+          modulesCompleted =
+              (statisticsResponse['modules_completed'] as int?) ?? 0;
+          questionsThisWeek =
+              (statisticsResponse['questions_answered_this_week'] as int?) ?? 0;
+          currentStreak = (statisticsResponse['current_streak'] as int?) ?? 0;
+        }
+      } catch (e) {
+        print('Keine user_statistics gefunden: $e');
+        modulesCompleted = 0;
+        questionsThisWeek = 0;
+        currentStreak = 0;
+      }
+    } catch (e) {
+      print('Fehler beim Berechnen der User-Statistiken: $e');
+    }
+  }
+
+  // NEU: Profil aktualisieren (VERBESSERTE VERSION MIT DEBUGGING)
+  // NEU: Profil aktualisieren (MIT AUTH-EMAIL UPDATE)
+  // NEU: Profil aktualisieren (OHNE VERIFIZIERUNG - MIT SOFORTIGER EMAIL-ÄNDERUNG)
+  // NEU: Profil aktualisieren (DIREKT OHNE VERIFIZIERUNG)
+  Future<bool> updateProfile({
+    required String name,
+    required String email,
+    required String username,
+  }) async {
+    try {
+      print('=== START updateProfile ===');
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) {
+        print('❌ FEHLER: Kein eingeloggter User');
+        return false;
+      }
+
+      print('✅ User gefunden: ${user.id}, ${user.email}');
+
+      // ✅ WICHTIG: Prüfe ob Email geändert wurde
+      final originalAuthEmail = user.email ?? '';
+      bool emailChanged = email != originalAuthEmail;
+
+      // 1. UPDATE in user_profiles Tabelle
+      try {
+        final updateData = {
+          'name': name,
+          'email': email,
+          'username': username,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        print('🔄 Versuche UPDATE in user_profiles...');
+        final updateResult = await _supabase
+            .from('user_profiles')
+            .update(updateData)
+            .eq('id', user.id)
+            .select()
+            .single();
+
+        print('✅ UPDATE erfolgreich: $updateResult');
+      } catch (updateError) {
+        print('⚠️ UPDATE fehlgeschlagen: $updateError');
+
+        // Fallback: INSERT versuchen
+        try {
+          final insertData = {
+            'id': user.id,
+            'name': name,
+            'email': email,
+            'username': username,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          };
+
+          print('🔄 Versuche INSERT...');
+          final insertResult = await _supabase
+              .from('user_profiles')
+              .insert(insertData)
+              .select()
+              .single();
+
+          print('✅ INSERT erfolgreich: $insertResult');
+        } catch (insertError) {
+          print('❌ INSERT auch fehlgeschlagen: $insertError');
+          return false;
+        }
+      }
+
+      // 2. WICHTIG: Auth-Email DIREKT aktualisieren (ohne Verifizierung)
+      if (emailChanged) {
+        print('🔄 Aktualisiere Auth-Email von $originalAuthEmail zu $email');
+        try {
+          // Direkte Email-Änderung (funktioniert weil "Confirm email change" OFF ist)
+          await _supabase.auth.updateUser(UserAttributes(email: email));
+          print('✅ Auth-Email SOFORT geändert auf: $email');
+
+          // Keine Verifizierungs-Email wird gesendet!
+        } catch (authError) {
+          print('⚠️ Auth-Email Update fehlgeschlagen: $authError');
+
+          // Fehler-Handling
+          if (authError.toString().contains('already in use')) {
+            print('⚠️ Diese Email wird bereits verwendet');
+          } else {
+            print('⚠️ Unbekannter Fehler: $authError');
+          }
+
+          // Auch bei Fehler weiter machen, da user_profiles schon aktualisiert
+        }
+      }
+
+      // 3. Lokale Daten aktualisieren
+      profileName = name;
+      profileEmail = email; // Lokal die neue Email setzen
+      profileUsername = username;
+      userName = name;
+      userInitials = name.isNotEmpty
+          ? name
+                .split(' ')
+                .where((e) => e.isNotEmpty)
+                .map((e) => e[0])
+                .take(2)
+                .join()
+                .toUpperCase()
+          : 'U';
+
+      // 4. Benachrichtigen
+      notifyListeners();
+
+      // 5. Erfolgreiche Aktualisierung melden
+      print('✅ UpdateProfile erfolgreich abgeschlossen');
+      print(
+        emailChanged
+            ? '📧 Email wurde SOFORT geändert auf: $email'
+            : '✅ Nur Name/Username aktualisiert',
+      );
+
+      return true;
+    } catch (e) {
+      print('❌ UNBEKANNTER FEHLER: $e');
+      print('Stacktrace: ${e.toString()}');
+      return false;
+    }
+  }
+
   // Module separat laden (z.B. für Modules Screen)
   Future<void> fetchModules() async {
     isLoading = true;
@@ -463,21 +677,22 @@ class BackendProvider with ChangeNotifier {
 
     try {
       debugPrint('fetchModules: querying supabase modules table...');
-      final modulesData = await _supabase.from('modules').select('*') as List<dynamic>;
+      final modulesData =
+          await _supabase.from('modules').select('*') as List<dynamic>;
       debugPrint('fetchModules: received ${modulesData.length} rows');
 
       lastModules = modulesData.map((e) {
         final m = e as Map<String, dynamic>;
         final idVal = m['id'];
-        final idInt = (idVal is int) ? idVal : (idVal is num ? idVal.toInt() : int.tryParse(idVal?.toString() ?? '0') ?? 0);
+        final idInt = (idVal is int)
+            ? idVal
+            : (idVal is num
+                  ? idVal.toInt()
+                  : int.tryParse(idVal?.toString() ?? '0') ?? 0);
         final nameVal = (m['title'] ?? m['name'] ?? '').toString();
         final descVal = (m['description'] ?? '').toString();
         debugPrint('fetchModules: row -> id=$idInt name=$nameVal');
-        return LernenModule(
-          id: idInt,
-          name: nameVal,
-          description: descVal,
-        );
+        return LernenModule(id: idInt, name: nameVal, description: descVal);
       }).toList();
     } catch (e) {
       error = 'Konnte Module nicht laden: $e';
@@ -515,10 +730,12 @@ class BackendProvider with ChangeNotifier {
   // --- Submodule laden ---
   Future<List<Map<String, dynamic>>> fetchSubmodules(dynamic moduleId) async {
     try {
-      final subs = await _supabase
-          .from('submodules')
-          .select('*')
-          .eq('modules_id', moduleId) as List<dynamic>;
+      final subs =
+          await _supabase
+                  .from('submodules')
+                  .select('*')
+                  .eq('modules_id', moduleId)
+              as List<dynamic>;
 
       return subs.map((e) => e as Map<String, dynamic>).toList();
     } catch (e) {
@@ -529,31 +746,45 @@ class BackendProvider with ChangeNotifier {
   }
 
   // --- Karten für Submodule + Level laden ---
-    Future<List<Map<String, dynamic>>> fetchCardsForSubmoduleLevel(
-      dynamic submoduleId, int level) async {
+  Future<List<Map<String, dynamic>>> fetchCardsForSubmoduleLevel(
+    dynamic submoduleId,
+    int level,
+  ) async {
     try {
-        debugPrint('fetchCardsForSubmoduleLevel: submoduleId=$submoduleId level=$level');
+      debugPrint(
+        'fetchCardsForSubmoduleLevel: submoduleId=$submoduleId level=$level',
+      );
 
-        final cards = await _supabase
-            .from('questions')
-            .select('*')
-            .eq('submodule_id', submoduleId)
-            .eq('level_number', level) as List<dynamic>;
+      final cards =
+          await _supabase
+                  .from('questions')
+                  .select('*')
+                  .eq('submodule_id', submoduleId)
+                  .eq('level_number', level)
+              as List<dynamic>;
 
-        debugPrint('fetchCardsForSubmoduleLevel: got ${cards.length} rows with level filter');
+      debugPrint(
+        'fetchCardsForSubmoduleLevel: got ${cards.length} rows with level filter',
+      );
 
-        if (cards.isEmpty) {
-          // Fallback: lade alle Fragen für das Submodule ohne Level-Filter
-          debugPrint('fetchCardsForSubmoduleLevel: fallback to submodule-only query');
-          final all = await _supabase
-              .from('questions')
-              .select('*')
-              .eq('submodule_id', submoduleId) as List<dynamic>;
-          debugPrint('fetchCardsForSubmoduleLevel: got ${all.length} rows without level filter');
-          return all.map((e) => e as Map<String, dynamic>).toList();
-        }
+      if (cards.isEmpty) {
+        // Fallback: lade alle Fragen für das Submodule ohne Level-Filter
+        debugPrint(
+          'fetchCardsForSubmoduleLevel: fallback to submodule-only query',
+        );
+        final all =
+            await _supabase
+                    .from('questions')
+                    .select('*')
+                    .eq('submodule_id', submoduleId)
+                as List<dynamic>;
+        debugPrint(
+          'fetchCardsForSubmoduleLevel: got ${all.length} rows without level filter',
+        );
+        return all.map((e) => e as Map<String, dynamic>).toList();
+      }
 
-        return cards.map((e) => e as Map<String, dynamic>).toList();
+      return cards.map((e) => e as Map<String, dynamic>).toList();
     } catch (e) {
       error = 'Konnte Karten nicht laden: $e';
       notifyListeners();
@@ -561,18 +792,24 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-    // --- ALLE Fragen eines Submoduls laden (für Quiz-Session) ---
-  Future<List<Map<String, dynamic>>> fetchAllQuestionsForSubmodule(dynamic submoduleId) async {
+  // --- ALLE Fragen eines Submoduls laden (für Quiz-Session) ---
+  Future<List<Map<String, dynamic>>> fetchAllQuestionsForSubmodule(
+    dynamic submoduleId,
+  ) async {
     try {
       debugPrint('fetchAllQuestionsForSubmodule: submoduleId=$submoduleId');
 
-      final questions = await _supabase
-          .from('questions')
-          .select('*')
-          .eq('submodule_id', submoduleId)
-          .order('level_number', ascending: true) as List<dynamic>;
+      final questions =
+          await _supabase
+                  .from('questions')
+                  .select('*')
+                  .eq('submodule_id', submoduleId)
+                  .order('level_number', ascending: true)
+              as List<dynamic>;
 
-      debugPrint('fetchAllQuestionsForSubmodule: received ${questions.length} questions');
+      debugPrint(
+        'fetchAllQuestionsForSubmodule: received ${questions.length} questions',
+      );
       return questions.map((e) => e as Map<String, dynamic>).toList();
     } catch (e) {
       debugPrint('fetchAllQuestionsForSubmodule error: $e');
@@ -581,29 +818,37 @@ class BackendProvider with ChangeNotifier {
   }
 
   // --- Optionen für eine Frage laden ---
-    Future<List<Map<String, dynamic>>> fetchOptionsForQuestion(dynamic questionId) async {
-      try {
-        final opts = await _supabase
-            .from('options')
-            .select('*')
-            .eq('question_id', questionId) as List<dynamic>;
+  Future<List<Map<String, dynamic>>> fetchOptionsForQuestion(
+    dynamic questionId,
+  ) async {
+    try {
+      final opts =
+          await _supabase
+                  .from('options')
+                  .select('*')
+                  .eq('question_id', questionId)
+              as List<dynamic>;
 
-        return opts.map((e) => e as Map<String, dynamic>).toList();
-      } catch (e) {
-        debugPrint('fetchOptionsForQuestion error: $e');
-        return [];
-      }
+      return opts.map((e) => e as Map<String, dynamic>).toList();
+    } catch (e) {
+      debugPrint('fetchOptionsForQuestion error: $e');
+      return [];
     }
+  }
 
   // --- Optionen für mehrere Fragen batch-laden ---
-  Future<Map<dynamic, List<Map<String, dynamic>>>> fetchOptionsForQuestions(List<dynamic> questionIds) async {
+  Future<Map<dynamic, List<Map<String, dynamic>>>> fetchOptionsForQuestions(
+    List<dynamic> questionIds,
+  ) async {
     try {
       if (questionIds.isEmpty) return {};
 
-      final allOptions = await _supabase
-          .from('options')
-          .select('*')
-          .inFilter('question_id', questionIds) as List<dynamic>;
+      final allOptions =
+          await _supabase
+                  .from('options')
+                  .select('*')
+                  .inFilter('question_id', questionIds)
+              as List<dynamic>;
 
       // Gruppiere nach question_id
       final Map<dynamic, List<Map<String, dynamic>>> grouped = {};
@@ -628,15 +873,17 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return null;
 
-      final insert = await _supabase.from('learning_sessions').insert({
-        'user_id': user.id,
-        'submodule_id': submoduleId,
-        'start_time': DateTime.now().toIso8601String(),
-        'total_questions': 0,
-        'correct_answered': 0,
-        'incorrect_answered': 0,
-        'status': 'active',
-      }).select() as List<dynamic>;
+      final insert =
+          await _supabase.from('learning_sessions').insert({
+                'user_id': user.id,
+                'submodule_id': submoduleId,
+                'start_time': DateTime.now().toIso8601String(),
+                'total_questions': 0,
+                'correct_answered': 0,
+                'incorrect_answered': 0,
+                'status': 'active',
+              }).select()
+              as List<dynamic>;
 
       final session = insert.first as Map<String, dynamic>;
       lastSession = session;
@@ -649,27 +896,36 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  Future<void> finishLearningSession(String sessionId,
-      {required int total, required int correct}) async {
+  Future<void> finishLearningSession(
+    String sessionId, {
+    required int total,
+    required int correct,
+  }) async {
     try {
       final incorrect = total - correct;
       final accuracy = total == 0 ? 0 : ((correct / total) * 100).round();
 
-      await _supabase.from('learning_sessions').update({
-        'end_time': DateTime.now().toIso8601String(),
-        'total_questions': total,
-        'correct_answered': correct,
-        'incorrect_answered': incorrect,
-        'accuracy_percentage': accuracy,
-        'status': 'finished',
-      }).eq('id', sessionId);
+      await _supabase
+          .from('learning_sessions')
+          .update({
+            'end_time': DateTime.now().toIso8601String(),
+            'total_questions': total,
+            'correct_answered': correct,
+            'incorrect_answered': incorrect,
+            'accuracy_percentage': accuracy,
+            'status': 'finished',
+          })
+          .eq('id', sessionId);
 
       // Aktualisiere lokale letzte Session
-      lastSession = (await _supabase
-          .from('learning_sessions')
-          .select()
-          .eq('id', sessionId) as List<dynamic>)
-          .first as Map<String, dynamic>;
+      lastSession =
+          (await _supabase
+                          .from('learning_sessions')
+                          .select()
+                          .eq('id', sessionId)
+                      as List<dynamic>)
+                  .first
+              as Map<String, dynamic>;
 
       notifyListeners();
     } catch (e) {
@@ -685,26 +941,31 @@ class BackendProvider with ChangeNotifier {
       if (user == null) return;
 
       // hole bestehenden Fortschritt
-      final existing = await _supabase
-          .from('user_card_progress')
-          .select()
-          .eq('user_id', user.id)
-          .eq('card_id', cardId) as List<dynamic>;
+      final existing =
+          await _supabase
+                  .from('user_card_progress')
+                  .select()
+                  .eq('user_id', user.id)
+                  .eq('card_id', cardId)
+              as List<dynamic>;
 
-      Map<String, dynamic>? progress =
-          existing.isNotEmpty ? existing.first as Map<String, dynamic> : null;
+      Map<String, dynamic>? progress = existing.isNotEmpty
+          ? existing.first as Map<String, dynamic>
+          : null;
 
       if (progress == null) {
         // Erstelle neuen Eintrag
-        final insert = await _supabase.from('user_card_progress').insert({
-          'user_id': user.id,
-          'card_id': cardId,
-          'correct_count': correct ? 1 : 0,
-          'incorrect_count': correct ? 0 : 1,
-          'streak_count': correct ? 1 : 0,
-          'is_mastered': correct ? (1 >= 6) : false,
-          'last_reviewed': DateTime.now().toIso8601String(),
-        }).select() as List<dynamic>;
+        final insert =
+            await _supabase.from('user_card_progress').insert({
+                  'user_id': user.id,
+                  'card_id': cardId,
+                  'correct_count': correct ? 1 : 0,
+                  'incorrect_count': correct ? 0 : 1,
+                  'streak_count': correct ? 1 : 0,
+                  'is_mastered': correct ? (1 >= 6) : false,
+                  'last_reviewed': DateTime.now().toIso8601String(),
+                }).select()
+                as List<dynamic>;
 
         progress = insert.first as Map<String, dynamic>;
       } else {
@@ -723,13 +984,16 @@ class BackendProvider with ChangeNotifier {
 
         final isMastered = streak >= 6;
 
-        await _supabase.from('user_card_progress').update({
-          'streak_count': streak,
-          'correct_count': correctCount,
-          'incorrect_count': incorrectCount,
-          'is_mastered': isMastered,
-          'last_reviewed': DateTime.now().toIso8601String(),
-        }).eq('id', progress['id']);
+        await _supabase
+            .from('user_card_progress')
+            .update({
+              'streak_count': streak,
+              'correct_count': correctCount,
+              'incorrect_count': incorrectCount,
+              'is_mastered': isMastered,
+              'last_reviewed': DateTime.now().toIso8601String(),
+            })
+            .eq('id', progress['id']);
       }
 
       // Nach Update: berechne Level-Fortschritt und evtl. freischalten
@@ -743,61 +1007,75 @@ class BackendProvider with ChangeNotifier {
 
   // --- Hilfsfunktion: Level-Fortschritt neu berechnen und ggf. freischalten ---
   Future<void> _recalculateSubmoduleLevelProgressForCard(
-      String cardId, String userId) async {
+    String cardId,
+    String userId,
+  ) async {
     try {
       // Karte laden, um submodule_id und level zu kennen
-        final cardList = await _supabase
-          .from('questions')
-          .select()
-          .eq('id', cardId) as List<dynamic>;
+      final cardList =
+          await _supabase.from('questions').select().eq('id', cardId)
+              as List<dynamic>;
 
       if (cardList.isEmpty) return;
       final card = cardList.first as Map<String, dynamic>;
-      final submoduleId = (card['submodule_id'] ?? card['submoduleId']).toString();
+      final submoduleId = (card['submodule_id'] ?? card['submoduleId'])
+          .toString();
       final level = (card['level_number'] ?? card['level']) as int;
 
       // Anzahl Karten in diesem Submodule-Level
-      final allCards = await _supabase
-          .from('questions')
-          .select('id')
-          .eq('submodule_id', submoduleId)
-          .eq('level_number', level) as List<dynamic>;
+      final allCards =
+          await _supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('submodule_id', submoduleId)
+                  .eq('level_number', level)
+              as List<dynamic>;
 
       final total = allCards.length;
 
       // Anzahl gemeisterter Karten durch Nutzer
-        final allCardIds = allCards.map((e) => e['id']).toList();
+      final allCardIds = allCards.map((e) => e['id']).toList();
 
-        final userProgress = await _supabase
-          .from('user_card_progress')
-          .select('id,card_id,is_mastered')
-          .eq('user_id', userId) as List<dynamic>;
+      final userProgress =
+          await _supabase
+                  .from('user_card_progress')
+                  .select('id,card_id,is_mastered')
+                  .eq('user_id', userId)
+              as List<dynamic>;
 
-        final mastered = userProgress
-          .where((p) => (p['is_mastered'] == true) && allCardIds.contains(p['card_id']))
+      final mastered = userProgress
+          .where(
+            (p) =>
+                (p['is_mastered'] == true) && allCardIds.contains(p['card_id']),
+          )
           .toList();
 
-        final masteredCount = mastered.length;
+      final masteredCount = mastered.length;
       final percent = total == 0 ? 0.0 : (masteredCount / total) * 100.0;
 
       // Update or insert progress for this submodule-level
-      final existing = await _supabase
-          .from('user_submodule_level_progress')
-          .select()
-          .eq('user_id', userId)
-          .eq('submodule_id', submoduleId)
-          .eq('level_number', level) as List<dynamic>;
+      final existing =
+          await _supabase
+                  .from('user_submodule_level_progress')
+                  .select()
+                  .eq('user_id', userId)
+                  .eq('submodule_id', submoduleId)
+                  .eq('level_number', level)
+              as List<dynamic>;
 
       final unlocked = percent >= 80.0;
 
       if (existing.isNotEmpty) {
-        await _supabase.from('user_submodule_level_progress').update({
-          'cards_mastered': masteredCount,
-          'cards_answered': await _countAnsweredInList(userId, allCards),
-          'is_unlocked': unlocked,
-          'updated_at': DateTime.now().toIso8601String(),
-          'last_accessed': DateTime.now().toIso8601String(),
-        }).eq('id', (existing.first as Map<String, dynamic>)['id']);
+        await _supabase
+            .from('user_submodule_level_progress')
+            .update({
+              'cards_mastered': masteredCount,
+              'cards_answered': await _countAnsweredInList(userId, allCards),
+              'is_unlocked': unlocked,
+              'updated_at': DateTime.now().toIso8601String(),
+              'last_accessed': DateTime.now().toIso8601String(),
+            })
+            .eq('id', (existing.first as Map<String, dynamic>)['id']);
       } else {
         await _supabase.from('user_submodule_level_progress').insert({
           'user_id': userId,
@@ -814,12 +1092,14 @@ class BackendProvider with ChangeNotifier {
       // Wenn freigeschaltet: evtl. nächsten Level-Eintrag sicherstellen
       if (unlocked) {
         final nextLevel = level + 1;
-        final existingNext = await _supabase
-            .from('user_submodule_level_progress')
-            .select()
-            .eq('user_id', userId)
-            .eq('submodule_id', submoduleId)
-            .eq('level_number', nextLevel) as List<dynamic>;
+        final existingNext =
+            await _supabase
+                    .from('user_submodule_level_progress')
+                    .select()
+                    .eq('user_id', userId)
+                    .eq('submodule_id', submoduleId)
+                    .eq('level_number', nextLevel)
+                as List<dynamic>;
 
         if (existingNext.isEmpty) {
           await _supabase.from('user_submodule_level_progress').insert({
@@ -839,17 +1119,24 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  Future<int> _countAnsweredInList(String userId, List<dynamic> allCards) async {
+  Future<int> _countAnsweredInList(
+    String userId,
+    List<dynamic> allCards,
+  ) async {
     if (allCards.isEmpty) return 0;
     try {
-        final allCardIds = allCards.map((e) => e['id']).toList();
-        final userProgress = await _supabase
-          .from('user_card_progress')
-          .select('id,card_id')
-          .eq('user_id', userId) as List<dynamic>;
+      final allCardIds = allCards.map((e) => e['id']).toList();
+      final userProgress =
+          await _supabase
+                  .from('user_card_progress')
+                  .select('id,card_id')
+                  .eq('user_id', userId)
+              as List<dynamic>;
 
-        final answered = userProgress.where((p) => allCardIds.contains(p['card_id'])).toList();
-        return answered.length;
+      final answered = userProgress
+          .where((p) => allCardIds.contains(p['card_id']))
+          .toList();
+      return answered.length;
     } catch (_) {
       return 0;
     }
@@ -928,9 +1215,7 @@ class HomeScreen extends StatelessWidget {
           }
 
           if (provider.error != null) {
-            return Scaffold(
-              body: Center(child: Text(provider.error!)),
-            );
+            return Scaffold(body: Center(child: Text(provider.error!)));
           }
 
           return Scaffold(
@@ -975,26 +1260,33 @@ class HomeScreen extends StatelessWidget {
                           label: 'Modules completed',
                         ),
                         const SizedBox(height: 24),
-                        const Text('Continue where you left off',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        const Text(
+                          'Continue where you left off',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         for (var module in provider.lastModules)
                           QuizCard(
                             moduleTitle: module.name,
                             moduleDescription: module.description ?? '',
-                            progress:
-                            provider.calculateProgress(provider.lastSession),
+                            progress: provider.calculateProgress(
+                              provider.lastSession,
+                            ),
                             onResume: () {},
                           ),
                         const SizedBox(height: 24),
-                        const Text('Quick Actions',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        const Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         CategoryCard(
                           icon: Icons.stacked_bar_chart,
