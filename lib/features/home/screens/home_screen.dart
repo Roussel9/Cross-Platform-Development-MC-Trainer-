@@ -9,34 +9,13 @@ import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
 import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
 import '../../../main.dart';
 import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
+import 'package:mc_trainer_kami/models/achievement_data.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class Achievement {
-  final String id;
-  final String title;
-  final String description;
-  final IconData icon;
-  final Color color;
-  final bool isUnlocked;
-  final DateTime? unlockedDate;
-  final int points;
-
-  Achievement({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.color,
-    required this.isUnlocked,
-    this.unlockedDate,
-    required this.points,
-  });
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -47,64 +26,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAchievements();
     // Home-Daten laden
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BackendProvider>().fetchHomeData();
     });
-  }
 
-  void _loadAchievements() {
-    _achievements = [
-      Achievement(
-        id: '1',
-        title: 'Speed Learner',
-        description: 'Completed 5 lessons in one day',
-        icon: Icons.bolt,
-        color: Colors.amber,
-        isUnlocked: true,
-        unlockedDate: DateTime.now().subtract(const Duration(days: 2)),
-        points: 50,
-      ),
-      Achievement(
-        id: '2',
-        title: 'Week Warrior',
-        description: 'Maintained 7-day streak',
-        icon: Icons.calendar_today,
-        color: Colors.blue,
-        isUnlocked: true,
-        unlockedDate: DateTime.now(),
-        points: 100,
-      ),
-      Achievement(
-        id: '3',
-        title: 'Perfect Score',
-        description: 'Got 100% on a quiz',
-        icon: Icons.star,
-        color: Colors.purple,
-        isUnlocked: true,
-        unlockedDate: DateTime.now().subtract(const Duration(days: 3)),
-        points: 75,
-      ),
-      Achievement(
-        id: '4',
-        title: 'Module Master',
-        description: 'Complete all modules in a category',
-        icon: Icons.auto_awesome,
-        color: Colors.green,
-        isUnlocked: false,
-        points: 150,
-      ),
-      Achievement(
-        id: '5',
-        title: 'Early Bird',
-        description: 'Complete a lesson before 8 AM',
-        icon: Icons.wb_sunny,
-        color: Colors.orange,
-        isUnlocked: false,
-        points: 25,
-      ),
-    ];
+    final backend = context.read<BackendProvider>();
+    _achievements = backend.myAchievements;
+    print('test 4:' + backend.myAchievements.length.toString());
   }
 
   void _onItemTapped(int index) {
@@ -118,8 +47,19 @@ class _HomeScreenState extends State<HomeScreen> {
         // Bereits auf Home, nichts tun oder zurückscrollen
         break;
       case 1: // Modules
-        // TODO: Hier ModuleScreen Navigation implementieren
-        // Navigator.push(context, MaterialPageRoute(builder: (context) => ModulesScreen()));
+        // Navigiere zum neuen Modul-Listen-Screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ModuleListScreen()),
+        );
+        // Setze den Index zurück auf Home nach der Navigation
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              _selectedIndex = 0;
+            });
+          }
+        });
         break;
       case 2: // Profile
         Navigator.push(
@@ -228,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back, ${backend.userName}!',
+            'Welcome, ${backend.userName}!',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -250,13 +190,13 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Questions this week',
           ),
           _buildStatCard(
-            icon: Icons.watch_later_outlined,
-            value: '${backend.currentStreak} days',
-            label: 'Current streak',
+            icon: Icons.star_border_purple500_outlined,
+            value: '${backend.achievedPoint} Points',
+            label: 'Total Scored Points',
           ),
           _buildStatCard(
             icon: Icons.workspace_premium_outlined,
-            value: '${backend.modulesCompleted}/${backend.lastModules.length}',
+            value: '${backend.lastModules.length}/${backend.modulesCompleted}',
             label: 'Modules completed',
           ),
         ],
@@ -270,12 +210,12 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: achievement.isUnlocked
-            ? achievement.color.withOpacity(0.1)
+            ? achievement.color!.withOpacity(0.1)
             : Colors.grey[100],
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: achievement.isUnlocked
-              ? achievement.color.withOpacity(0.3)
+              ? achievement.color!.withOpacity(0.3)
               : Colors.grey[300]!,
         ),
       ),
@@ -319,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: achievement.color.withOpacity(0.2),
+                          color: achievement.color!.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -388,6 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMainContent(BuildContext context, BackendProvider backend) {
     final unlockedCount = _achievements.where((a) => a.isUnlocked).length;
     final totalCount = _achievements.length;
+    print('test 3: ' + totalCount.toString());
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
@@ -488,21 +429,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         return _buildAchievementItem(achievement);
                       }).toList(),
                       const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            // Optional: Zur vollständigen Achievements-Seite navigieren
-                          },
-                          child: const Text(
-                            'View All →',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
