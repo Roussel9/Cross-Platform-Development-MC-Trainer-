@@ -5,14 +5,17 @@ import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/widgets/custom_app_appbar.dart';
 import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
+import 'package:provider/provider.dart';
+import 'package:mc_trainer_kami/provider/backend_provider.dart';
 import 'quiz_screen.dart'; // NEU: Import für den QuizScreen
 
 // Widget für eine einzelne Lektion (JETZT ALS KARTE)
 class LessonCard extends StatelessWidget {
   final Module module; // HINZUGEFÜGT für die Navigation
   final Lesson lesson;
+  final VoidCallback? onTap;
 
-  const LessonCard({super.key, required this.module, required this.lesson});
+  const LessonCard({super.key, required this.module, required this.lesson, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -35,18 +38,7 @@ class LessonCard extends StatelessWidget {
 
     // InkWell für Tipp-Feedback und Navigation
     return InkWell(
-      onTap: lesson.isLocked
-          ? null
-          : () {
-              // Navigation zum QuizScreen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      QuizScreen(module: module, lesson: lesson),
-                ),
-              );
-            },
+      onTap: lesson.isLocked ? null : onTap,
       child: Container(
         margin: const EdgeInsets.only(
           bottom: 16,
@@ -227,20 +219,121 @@ class LessonListScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Lektionen-Liste (als Column von Cards)
+                  // Lektionen-Liste (lade Submodules aus Supabase)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 16,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: module.lessons.map((lesson) {
-                        return LessonCard(
-                          module: module,
-                          lesson: lesson,
-                        ); // Weitergabe des Moduls
-                      }).toList(),
+                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                      future: Provider.of<BackendProvider>(context, listen: false)
+                          .fetchSubmodules(module.id ?? 0),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState != ConnectionState.done) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text('Fehler beim Laden der Lektionen: ${snapshot.error}'),
+                          );
+                        }
+
+                        final subs = snapshot.data ?? [];
+                        if (subs.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Text('No lessons (submodules) found.'),
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: subs.map<Widget>((s) {
+                            final subId = s['id'];
+                            final levelNum = (s['level'] is int) ? s['level'] as int : (int.tryParse(s['level']?.toString() ?? '1') ?? 1);
+
+                            // NEU: Für jedes Submodul die Fragen-Anzahl async laden
+                            return FutureBuilder<List<Map<String, dynamic>>>(
+                              future: Provider.of<BackendProvider>(context, listen: false)
+                                  .fetchAllQuestionsForSubmodule(subId),
+                              builder: (context, questionSnapshot) {
+                                final questionsCount = questionSnapshot.data?.length ?? 0;
+
+                                final lesson = Lesson(
+                                  title: s['title']?.toString() ?? 'Untitled',
+                                  duration: '${s['estimate_duration'] ?? '-'} min',
+                                  questions: questionsCount, // NEU: Echte Anzahl
+                                  isLocked: false,
+                                );
+
+                                return LessonCard(
+                                  module: module,
+                                  lesson: lesson,
+                                  onTap: questionSnapshot.data == null
+                                      ? null // Noch beim Laden
+                                      : () async {
+                                    if (questionSnapshot.data!.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Keine Fragen in diesem Submodul.')));
+                                      return;
+                                    }
+
+                                    final provider = Provider.of<BackendProvider>(context, listen: false);
+                                    final questionsData = questionSnapshot.data!;
+
+                                    // Lade Optionen für alle Fragen batch-weise
+                                    final questionIds = questionsData.map((q) => q['id']).toList();
+                                    final optionsMap = await provider.fetchOptionsForQuestions(questionIds);
+
+                                    final List<Question> quizQuestions = [];
+                                    for (var q in questionsData) {
+                                      final qMap = q as Map<String, dynamic>;
+                                      final qId = qMap['id'];
+                                      final opts = optionsMap[qId] ?? [];
+                                      
+                                      final options = opts.map((o) => Option(
+                                            text: o['text']?.toString() ?? '',
+                                            label: o['label']?.toString() ?? '',
+                                            isCorrect: (o['is_correct'] == true),
+                                          )).toList();
+
+                                      int correctIndex = 0;
+                                      for (int i = 0; i < options.length; i++) {
+                                        if (options[i].isCorrect) { correctIndex = i; break; }
+                                      }
+
+                                      quizQuestions.add(Question(
+                                        id: qMap['id'], // NEU: Speichere Question ID
+                                        questionText: qMap['questionText']?.toString() ?? qMap['question_text']?.toString() ?? '',
+                                        options: options,
+                                        correctOptionIndex: correctIndex,
+                                        explanation: qMap['explanation']?.toString(),
+                                      ));
+                                    }
+
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => QuizScreen(
+                                          module: module,
+                                          lesson: Lesson(
+                                            title: lesson.title,
+                                            duration: lesson.duration,
+                                            questions: quizQuestions.length,
+                                            quizQuestions: quizQuestions,
+                                          ),
+                                          submoduleId: subId,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
                   ),
                 ],

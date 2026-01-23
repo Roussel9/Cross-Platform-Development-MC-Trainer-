@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
+import 'package:mc_trainer_kami/models/lernen_module.dart';
+import 'package:mc_trainer_kami/provider/backend_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/widgets/custom_app_appbar.dart';
 import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
@@ -505,9 +508,56 @@ class ModuleListScreen extends StatelessWidget {
               color: Colors.transparent,
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Column(
-                children: dummyModules.toList().map((module) {
-                  return ModuleCard(module: module);
-                }).toList(),
+                children: [
+                  Consumer<BackendProvider>(
+                    builder: (context, provider, _) {
+                      if (provider.isLoading) {
+                        return const Center(child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: CircularProgressIndicator(),
+                        ));
+                      }
+
+                      if (provider.error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text('Fehler: ${provider.error}'),
+                        );
+                      }
+
+                      debugPrint('ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}');
+                      // Konvertiere LernenModule -> lokale Module-View-Model
+                      final modules = provider.lastModules.map((lm) {
+                        return Module(
+                          id: lm.id,
+                          title: lm.name,
+                          description: lm.description ?? '',
+                          totalLessons: 0,
+                          completedLessons: 0,
+                          progress: 0.0,
+                          iconColor: Colors.blue,
+                          icon: Icons.book,
+                        );
+                      }).toList();
+
+                      if (modules.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text('No modules found.'),
+                        );
+                      }
+
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: modules.length,
+                        itemBuilder: (context, index) {
+                          return ModuleCard(module: modules[index]);
+                        },
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),

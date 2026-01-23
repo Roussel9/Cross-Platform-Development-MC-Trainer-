@@ -10,6 +10,7 @@ class Option {
 }
 
 class Question {
+  final dynamic id; // NEU: für Supabase DB-ID
   final String questionText;
   final List<Option> options;
   final int correctOptionIndex;
@@ -17,6 +18,7 @@ class Question {
   int? selectedOptionIndex;
 
   Question({
+    this.id,
     required this.questionText,
     required this.options,
     required this.correctOptionIndex,
@@ -44,6 +46,7 @@ class Lesson {
 }
 
 class Module {
+  final int? id;
   final String title;
   final String description;
   final int totalLessons;
@@ -55,6 +58,7 @@ class Module {
   final bool isCompleted;
 
   Module({
+    this.id,
     required this.title,
     required this.description,
     required this.totalLessons,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 // Stellen Sie sicher, dass diese Imports zu Ihren tatsächlichen Dateien passen
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
+import 'package:provider/provider.dart';
+import 'package:mc_trainer_kami/provider/backend_provider.dart';
 
 // =========================================================
 // DATEN MODELLE (Wiederholt zur Vollständigkeit, falls benötigt)
@@ -474,8 +476,14 @@ class QuizResultOverlay extends StatelessWidget {
 class QuizScreen extends StatefulWidget {
   final Module module;
   final Lesson lesson;
+  final dynamic submoduleId; // NEU: für Session-Tracking
 
-  const QuizScreen({super.key, required this.module, required this.lesson});
+  const QuizScreen({
+    super.key,
+    required this.module,
+    required this.lesson,
+    this.submoduleId,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -488,7 +496,9 @@ class _QuizScreenState extends State<QuizScreen> {
 
   bool _quizFinished = false;
   bool _isReviewMode = false;
+  bool _answerSubmitted = false; // NEU: Benutzer hat Antwort eingegeben
   int _correctAnswers = 0;
+  String? _sessionId; // NEU: für Session-Tracking
 
   @override
   void initState() {
@@ -500,11 +510,27 @@ class _QuizScreenState extends State<QuizScreen> {
       return Question(
         questionText: q.questionText,
         options: q.options,
-        selectedOptionIndex: q.selectedOptionIndex,
+        selectedOptionIndex: null, // Starten ohne Auswahl
         correctOptionIndex: correctIndex,
         explanation: q.explanation,
       );
     }).toList();
+
+    // NEU: Starte Learning Session in Supabase
+    _startSession();
+  }
+
+  Future<void> _startSession() async {
+    if (widget.submoduleId == null) return;
+    try {
+      final provider = Provider.of<BackendProvider>(context, listen: false);
+      final sessionId = await provider.startLearningSession(widget.submoduleId);
+      setState(() {
+        _sessionId = sessionId;
+      });
+    } catch (e) {
+      debugPrint('Failed to start session: $e');
+    }
   }
 
   @override
@@ -524,10 +550,32 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _selectOption(int optionIndex) {
-    if (!_isReviewMode) {
+    if (!_isReviewMode && !_answerSubmitted) {
       setState(() {
         _questions[_currentQuestionIndex].selectedOptionIndex = optionIndex;
+        _answerSubmitted = true; // Zeige Feedback
       });
+
+      // NEU: Speichere Antwort in Supabase
+      _recordAnswer(optionIndex);
+    }
+  }
+
+  Future<void> _recordAnswer(int selectedIndex) async {
+    try {
+      final provider = Provider.of<BackendProvider>(context, listen: false);
+      final question = _questions[_currentQuestionIndex];
+      final isCorrect = selectedIndex == question.correctOptionIndex;
+      
+      // NEU: Speichere Antwort mit Question ID (als String)
+      // Hier müssen wir die Question ID haben - müssen wir zur Question-Klasse hinzufügen
+      // Für jetzt: nur tracking
+      await provider.recordAnswer(
+        question.id?.toString() ?? 'unknown',
+        isCorrect,
+      );
+    } catch (e) {
+      debugPrint('Failed to record answer: $e');
     }
   }
 
@@ -535,6 +583,7 @@ class _QuizScreenState extends State<QuizScreen> {
     if (index >= 0 && index < _questions.length) {
       setState(() {
         _currentQuestionIndex = index;
+        _answerSubmitted = false; // Zurücksetzen für neue Frage
       });
       _scrollController.animateTo(
         0,
@@ -548,10 +597,26 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_currentQuestionIndex < _questions.length - 1) {
       _goToQuestion(_currentQuestionIndex + 1);
     } else {
+      // Quiz fertig
       _calculateResult();
       setState(() {
         _quizFinished = true;
       });
+      _finishSession();
+    }
+  }
+
+  Future<void> _finishSession() async {
+    if (_sessionId == null || widget.submoduleId == null) return;
+    try {
+      final provider = Provider.of<BackendProvider>(context, listen: false);
+      await provider.finishLearningSession(
+        _sessionId!,
+        total: _questions.length,
+        correct: _correctAnswers,
+      );
+    } catch (e) {
+      debugPrint('Failed to finish session: $e');
     }
   }
 
@@ -575,6 +640,7 @@ class _QuizScreenState extends State<QuizScreen> {
       _isReviewMode = false;
       _currentQuestionIndex = 0;
       _correctAnswers = 0;
+      _answerSubmitted = false;
 
       _questions = widget.lesson.quizQuestions.map((q) {
         final correctIndex = _getCorrectIndex(q.options);
@@ -588,6 +654,7 @@ class _QuizScreenState extends State<QuizScreen> {
       }).toList();
       _scrollController.jumpTo(0);
     });
+    _startSession(); // Neue Session starten
   }
 
   void _backToHome() {
@@ -872,21 +939,86 @@ class _QuizScreenState extends State<QuizScreen> {
                                     currentQuestion.selectedOptionIndex ==
                                     optionIndex;
 
-                                return _isReviewMode
-                                    ? ReviewOptionCard(
-                                        option: option,
-                                        isCorrect: isCorrect,
-                                        isSelected: isSelected,
-                                      )
-                                    : OptionCard(
-                                        option: option,
-                                        isSelected: isSelected,
-                                        onTap: () => _selectOption(optionIndex),
-                                      );
+                                // NEU: Im Quiz-Modus nach Auswahl oder Review-Modus
+                                if (_answerSubmitted || _isReviewMode) {
+                                  return ReviewOptionCard(
+                                    option: option,
+                                    isCorrect: isCorrect,
+                                    isSelected: isSelected,
+                                  );
+                                } else {
+                                  return OptionCard(
+                                    option: option,
+                                    isSelected: isSelected,
+                                    onTap: () => _selectOption(optionIndex),
+                                  );
+                                }
                               }).toList(),
 
-                              // Erklärungen im Review Mode
-                              if (_isReviewMode &&
+                              // NEU: Feedback nach Antwort
+                              if (_answerSubmitted && !_isReviewMode)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(15),
+                                    decoration: BoxDecoration(
+                                      color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                              _questions[_currentQuestionIndex]
+                                                  .correctOptionIndex)
+                                          ? Colors.green.shade50
+                                          : Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                                _questions[_currentQuestionIndex]
+                                                    .correctOptionIndex)
+                                            ? Colors.green.shade200
+                                            : Colors.red.shade200,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                                  _questions[_currentQuestionIndex]
+                                                      .correctOptionIndex)
+                                              ? Icons.check_circle
+                                              : Icons.cancel,
+                                          color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                                  _questions[_currentQuestionIndex]
+                                                      .correctOptionIndex)
+                                              ? Colors.green
+                                              : Colors.red,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                                    _questions[_currentQuestionIndex]
+                                                        .correctOptionIndex)
+                                                ? 'Correct!'
+                                                : 'Incorrect!',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                                      _questions[_currentQuestionIndex]
+                                                          .correctOptionIndex)
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                              // Erklärungen nach Antwort oder im Review Mode
+                              if ((_answerSubmitted || _isReviewMode) &&
                                   currentQuestion.explanation != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 20),
@@ -984,13 +1116,29 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                 ),
 
-                                // Next Button / Finish Button
+                                // Next Button / Finish Button (nur wenn Antwort gegeben)
                                 SizedBox(
                                   width: isSmallScreen ? 90 : 140,
-                                  child: ElevatedButton(
-                                    onPressed: _goToNextQuestion,
+                                  child: ElevatedButton.icon(
+                                    onPressed: (_answerSubmitted || _isReviewMode)
+                                        ? _goToNextQuestion
+                                        : null, // NEU: Disabled bis Antwort gegeben
+                                    icon: Icon(
+                                      _currentQuestionIndex == totalQuestions - 1
+                                          ? Icons.check
+                                          : Icons.arrow_forward_ios,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                    label: Text(
+                                      _currentQuestionIndex == totalQuestions - 1
+                                          ? 'Finish'
+                                          : 'Next',
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,
+                                      disabledBackgroundColor: Colors.grey,
                                       foregroundColor: Colors.white,
                                       elevation: 2,
                                       shape: RoundedRectangleBorder(
@@ -1000,29 +1148,10 @@ class _QuizScreenState extends State<QuizScreen> {
                                         vertical: 15,
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          _currentQuestionIndex ==
-                                                  _questions.length - 1
-                                              ? 'Finish'
-                                              : 'Next',
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Icon(
-                                          Icons.arrow_forward_ios,
-                                          size: 16,
-                                        ),
-                                      ],
-                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
                           ],
                         ),
                       ),
