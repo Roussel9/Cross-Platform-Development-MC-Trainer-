@@ -566,7 +566,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final provider = Provider.of<BackendProvider>(context, listen: false);
       final question = _questions[_currentQuestionIndex];
       final isCorrect = selectedIndex == question.correctOptionIndex;
-      
+
       // NEU: Speichere Antwort mit Question ID (als String)
       // Hier müssen wir die Question ID haben - müssen wir zur Question-Klasse hinzufügen
       // Für jetzt: nur tracking
@@ -658,7 +658,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _backToHome() {
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.pushNamed(context, '/home');
   }
 
   @override
@@ -962,14 +962,18 @@ class _QuizScreenState extends State<QuizScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(15),
                                     decoration: BoxDecoration(
-                                      color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                      color:
+                                          (_questions[_currentQuestionIndex]
+                                                  .selectedOptionIndex ==
                                               _questions[_currentQuestionIndex]
                                                   .correctOptionIndex)
                                           ? Colors.green.shade50
                                           : Colors.red.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                        color:
+                                            (_questions[_currentQuestionIndex]
+                                                    .selectedOptionIndex ==
                                                 _questions[_currentQuestionIndex]
                                                     .correctOptionIndex)
                                             ? Colors.green.shade200
@@ -981,12 +985,15 @@ class _QuizScreenState extends State<QuizScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Icon(
-                                          (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                          (_questions[_currentQuestionIndex]
+                                                      .selectedOptionIndex ==
                                                   _questions[_currentQuestionIndex]
                                                       .correctOptionIndex)
                                               ? Icons.check_circle
                                               : Icons.cancel,
-                                          color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                          color:
+                                              (_questions[_currentQuestionIndex]
+                                                      .selectedOptionIndex ==
                                                   _questions[_currentQuestionIndex]
                                                       .correctOptionIndex)
                                               ? Colors.green
@@ -996,7 +1003,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                            (_questions[_currentQuestionIndex]
+                                                        .selectedOptionIndex ==
                                                     _questions[_currentQuestionIndex]
                                                         .correctOptionIndex)
                                                 ? 'Correct!'
@@ -1004,7 +1012,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                              color:
+                                                  (_questions[_currentQuestionIndex]
+                                                          .selectedOptionIndex ==
                                                       _questions[_currentQuestionIndex]
                                                           .correctOptionIndex)
                                                   ? Colors.green
@@ -1120,21 +1130,26 @@ class _QuizScreenState extends State<QuizScreen> {
                                 SizedBox(
                                   width: isSmallScreen ? 90 : 140,
                                   child: ElevatedButton.icon(
-                                    onPressed: (_answerSubmitted || _isReviewMode)
+                                    onPressed:
+                                        (_answerSubmitted || _isReviewMode)
                                         ? _goToNextQuestion
                                         : null, // NEU: Disabled bis Antwort gegeben
                                     icon: Icon(
-                                      _currentQuestionIndex == totalQuestions - 1
+                                      _currentQuestionIndex ==
+                                              totalQuestions - 1
                                           ? Icons.check
                                           : Icons.arrow_forward_ios,
                                       size: 16,
                                       color: Colors.white,
                                     ),
                                     label: Text(
-                                      _currentQuestionIndex == totalQuestions - 1
+                                      _currentQuestionIndex ==
+                                              totalQuestions - 1
                                           ? 'Finish'
                                           : 'Next',
-                                      style: const TextStyle(color: Colors.white),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,

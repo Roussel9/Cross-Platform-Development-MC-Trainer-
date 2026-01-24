@@ -326,6 +326,14 @@ class BackendProvider with ChangeNotifier {
     error = null;
     notifyListeners();
 
+    Achievement defaultAchievement = Achievement(
+      id: 0,
+      title: 'default',
+      description: 'description',
+      isUnlocked: true,
+      points: 0,
+    );
+
     try {
       final user = _supabase.auth.currentUser;
 
@@ -368,9 +376,7 @@ class BackendProvider with ChangeNotifier {
         );
       });
 
-      print('test 1:' + achievements.length.toString());
       print('test 2:' + myAchievements.length.toString());
-      print('\n It is just a second test ' + achieved[0].toString() + '\n');
     } catch (e) {
       error = 'Diese Daten konnten nicht geladen werden.';
       print('Fehler: $e');
@@ -872,7 +878,7 @@ class BackendProvider with ChangeNotifier {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return null;
-
+      if (submoduleId == null) return null;
       final insert =
           await _supabase.from('learning_sessions').insert({
                 'user_id': user.id,
@@ -890,7 +896,7 @@ class BackendProvider with ChangeNotifier {
       notifyListeners();
       return session['id']?.toString();
     } catch (e) {
-      error = 'Konnte Session nicht starten: $e';
+      error = 'Konnte Session nicht starten:$submoduleId, $e';
       notifyListeners();
       return null;
     }
