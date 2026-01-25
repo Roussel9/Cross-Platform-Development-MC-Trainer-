@@ -9,6 +9,7 @@ import 'features/auth/screens/auth_wrapper.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/services/auth_service.dart';
 import 'provider/backend_provider.dart' hide HomeScreen;
+import 'features/modules/screens/import_modules_screen.dart';
 
 // --- Supabase Verbindung im Hintergrund testen ---
 void _testConnectionInBackground() async {
@@ -66,6 +67,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         //'/forgot-password': (context) => const ForgotPasswordScreen(),
         '/home': (context) => const HomeScreen(),
+        '/import-modules': (context) => const ImportModulesScreen(),
         // '/achievements': (context) => const AchievementsScreen(),
         // '/quiz': (context) => const QuizScreen(),
       },
