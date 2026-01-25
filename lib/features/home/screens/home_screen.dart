@@ -5,7 +5,6 @@ import 'package:mc_trainer_kami/core/constants/app_strings.dart';
 import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
-import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
 import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
 import '../../../main.dart';
 import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
@@ -196,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           _buildStatCard(
             icon: Icons.workspace_premium_outlined,
-            value: '${backend.lastModules.length}/${backend.modulesCompleted}',
+            value: '${backend.lastModule.length}/${backend.modulesCompleted}',
             label: 'Modules completed',
           ),
         ],
@@ -347,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           // Letzte Module anzeigen
-          ...backend.lastModules.map(
+          ...backend.lastModule.map(
             (module) => QuizCard(
               moduleTitle: module.name,
               moduleDescription: module.description ?? '',
@@ -372,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
           CategoryCard(
             icon: Icons.stacked_bar_chart,
             title: 'Browse Modules',
-            subtitle: '${backend.lastModules.length} modules available',
+            subtitle: '${backend.lastModule.length} modules available',
             iconColor: Theme.of(context).colorScheme.primary,
             onTap: () {
               // Navigiere zum neuen Modul-Listen-Screen

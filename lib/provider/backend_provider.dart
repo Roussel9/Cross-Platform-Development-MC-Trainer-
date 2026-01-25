@@ -37,7 +37,8 @@ class BackendProvider with ChangeNotifier {
   int modulesCompleted = 0;
 
   // Listen & Status
-  List<LernenModule> lastModules = [];
+  List<LernenModule> allModules = []; // pour Modules page
+  List<LernenModule> lastModule = []; // pour Home page
   Map<String, dynamic>? lastSession;
   List<Achievement> myAchievements = [];
   // NEU: Profil Daten
@@ -684,21 +685,16 @@ class BackendProvider with ChangeNotifier {
     try {
       debugPrint('fetchModules: querying supabase modules table...');
       final modulesData =
-          await _supabase.from('modules').select('*') as List<dynamic>;
+      await _supabase.from('modules').select('*') as List<dynamic>;
       debugPrint('fetchModules: received ${modulesData.length} rows');
 
-      lastModules = modulesData.map((e) {
+      allModules = modulesData.map((e) {
         final m = e as Map<String, dynamic>;
-        final idVal = m['id'];
-        final idInt = (idVal is int)
-            ? idVal
-            : (idVal is num
-                  ? idVal.toInt()
-                  : int.tryParse(idVal?.toString() ?? '0') ?? 0);
-        final nameVal = (m['title'] ?? m['name'] ?? '').toString();
-        final descVal = (m['description'] ?? '').toString();
-        debugPrint('fetchModules: row -> id=$idInt name=$nameVal');
-        return LernenModule(id: idInt, name: nameVal, description: descVal);
+        return LernenModule(
+          id: m['id'],
+          name: (m['title'] ?? m['name'] ?? '').toString(),
+          description: (m['description'] ?? '').toString(),
+        );
       }).toList();
     } catch (e) {
       error = 'Konnte Module nicht laden: $e';
@@ -1148,6 +1144,73 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
+  Future<void> fetchLastModuleForHome({int limit = 1}) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      // --- Letzte Lernsession des Users abrufen ---
+      final sessions = await _supabase
+          .from('learning_sessions')
+          .select('submodule_id, updated_at')
+          .eq('user_id', user.id)
+          .order('updated_at', ascending: false)
+          .limit(limit) as List<dynamic>;
+
+      if (sessions.isEmpty) {
+        lastModule = [];
+        notifyListeners();
+        return;
+      }
+
+      // --- Submodule IDs aus den Sessions extrahieren ---
+      final submoduleIds = sessions.map((s) => s['submodule_id']).toList();
+
+      // --- Module IDs aus den Submodules abrufen ---
+      final submodules = await _supabase
+          .from('submodules')
+          .select('id, module_id')
+          .filter('id', 'in', submoduleIds) as List<dynamic>;
+
+      // Variable vorher deklarieren
+      List<int> moduleIds = [];
+
+      // --- Module IDs extrahieren ---
+      moduleIds = submodules.map((s) => s['module_id'] as int).toSet().toList();
+
+      // --- Module abrufen ---
+      final modulesData = await _supabase
+          .from('modules')
+          .select('*')
+          .filter('id', 'in', moduleIds) as List<dynamic>;
+
+      lastModule = modulesData.map((m) {
+        final mod = m as Map<String, dynamic>;
+        return LernenModule(
+          id: mod['id'],
+          name: (mod['title'] ?? mod['name'] ?? '').toString(),
+          description: (mod['description'] ?? '').toString(),
+        );
+      }).toList();
+
+    } catch (e) {
+      print('Fehler beim Laden des letzten Moduls für Home: $e');
+      lastModule = [];
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+
+  // --- Getter für das letzte Modul (Home) ---
+    LernenModule? get latestModule =>
+        lastModule.isNotEmpty ? lastModule.first : null;
+
+
   // Optional: Clear-Methode für Logout
   void clearData() {
     reset();
@@ -1207,6 +1270,7 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1275,7 +1339,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        for (var module in provider.lastModules)
+                        for (var module in provider.lastModule)
                           QuizCard(
                             moduleTitle: module.name,
                             moduleDescription: module.description ?? '',

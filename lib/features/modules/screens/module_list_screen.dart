@@ -525,9 +525,9 @@ class ModuleListScreen extends StatelessWidget {
                         );
                       }
 
-                      debugPrint('ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}');
+                      debugPrint('ModuleListScreen: provider.allModules.length = ${provider.allModules.length}');
                       // Konvertiere LernenModule -> lokale Module-View-Model
-                      final modules = provider.lastModules.map((lm) {
+                      final modules = provider.allModules.map((lm) {
                         return Module(
                           id: lm.id,
                           title: lm.name,
