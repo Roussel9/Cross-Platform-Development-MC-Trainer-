@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async'; // NEU: Für Timer
 // Stellen Sie sicher, dass diese Imports zu Ihren tatsächlichen Dateien passen
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
@@ -20,6 +21,13 @@ import 'package:mc_trainer_kami/provider/backend_provider.dart';
 int _getCorrectIndex(List<Option> options) {
   final correctIndex = options.indexWhere((opt) => opt.isCorrect);
   return correctIndex == -1 ? 0 : correctIndex;
+}
+
+// NEU: Format Sekunden zu MM:SS
+String _formatTime(int seconds) {
+  final minutes = seconds ~/ 60;
+  final secs = seconds % 60;
+  return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
 }
 
 // =========================================================
@@ -273,18 +281,20 @@ class QuizResultOverlay extends StatelessWidget {
   final int correctAnswers;
   final int totalQuestions;
   final String title;
+  final int durationSeconds;
   final VoidCallback onReviewAnswers;
   final VoidCallback onRetryLesson;
-  final VoidCallback onBackToHome;
+  final VoidCallback onBackToModule;
 
   const QuizResultOverlay({
     super.key,
     required this.correctAnswers,
     required this.totalQuestions,
     required this.title,
+    required this.durationSeconds,
     required this.onReviewAnswers,
     required this.onRetryLesson,
-    required this.onBackToHome,
+    required this.onBackToModule,
   });
 
   Widget _buildStatPill(String label, dynamic value, Color color) {
@@ -401,7 +411,11 @@ class QuizResultOverlay extends StatelessWidget {
                     children: [
                       _buildStatPill('Correct', correctAnswers, Colors.green),
                       _buildStatPill('Incorrect', incorrectAnswers, Colors.red),
-                      _buildStatPill('Time', '01:30', Colors.blue),
+                      _buildStatPill(
+                        'Time',
+                        _formatTime(durationSeconds),
+                        Colors.blue,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 30),
@@ -443,13 +457,13 @@ class QuizResultOverlay extends StatelessWidget {
                         ),
                       ),
 
-                      // Back to Home Button
+                      // Back to Module Button
                       SizedBox(
                         width: isSmallScreen ? double.infinity : buttonMaxWidth,
                         child: ElevatedButton.icon(
-                          onPressed: onBackToHome,
-                          icon: const Icon(Icons.home, color: Colors.white),
-                          label: const Text('Back to Home'),
+                          onPressed: onBackToModule,
+                          icon: const Icon(Icons.view_list, color: Colors.white),
+                          label: const Text('Back to Module'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
@@ -499,6 +513,11 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _answerSubmitted = false; // NEU: Benutzer hat Antwort eingegeben
   int _correctAnswers = 0;
   String? _sessionId; // NEU: für Session-Tracking
+  bool _answerConfirmed = false; // NEU: Nutzer hat OK geklickt
+
+  // NEU: Timer für Quiz
+  late Timer _quizTimer;
+  int _elapsedSeconds = 0; // Verstrichene Sekunden
 
   @override
   void initState() {
@@ -508,6 +527,7 @@ class _QuizScreenState extends State<QuizScreen> {
     _questions = widget.lesson.quizQuestions.map((q) {
       final correctIndex = _getCorrectIndex(q.options);
       return Question(
+        id: q.id, // ✅ WICHTIG: ID mitkopieren!
         questionText: q.questionText,
         options: q.options,
         selectedOptionIndex: null, // Starten ohne Auswahl
@@ -518,6 +538,19 @@ class _QuizScreenState extends State<QuizScreen> {
 
     // NEU: Starte Learning Session in Supabase
     _startSession();
+
+    // NEU: Starte Timer
+    _startQuizTimer();
+  }
+
+  void _startQuizTimer() {
+    _elapsedSeconds = 0;
+    _quizTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _elapsedSeconds++;
+      });
+    });
+    debugPrint('⏱️ Quiz Timer gestartet');
   }
 
   Future<void> _startSession() async {
@@ -536,6 +569,8 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _quizTimer.cancel(); // NEU: Stoppe Timer beim Dispose
+
     super.dispose();
   }
 
@@ -553,11 +588,23 @@ class _QuizScreenState extends State<QuizScreen> {
     if (!_isReviewMode && !_answerSubmitted) {
       setState(() {
         _questions[_currentQuestionIndex].selectedOptionIndex = optionIndex;
-        _answerSubmitted = true; // Zeige Feedback
+        _answerConfirmed = false; // Zurücksetzen: Nutzer kann noch ändern
       });
+    }
+  }
 
-      // NEU: Speichere Antwort in Supabase
-      _recordAnswer(optionIndex);
+  void _confirmAnswer() {
+    if (!_isReviewMode && !_answerSubmitted && _questions[_currentQuestionIndex].selectedOptionIndex != null) {
+      final selectedIndex = _questions[_currentQuestionIndex].selectedOptionIndex!;
+      final isCorrect = selectedIndex == _questions[_currentQuestionIndex].correctOptionIndex;
+      setState(() {
+        _answerSubmitted = true; // Zeige Feedback
+        _answerConfirmed = true; // Markiere als bestätigt
+        if (isCorrect) {
+          _correctAnswers++;
+        }
+      });
+      _recordAnswer(selectedIndex);
     }
   }
 
@@ -566,7 +613,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final provider = Provider.of<BackendProvider>(context, listen: false);
       final question = _questions[_currentQuestionIndex];
       final isCorrect = selectedIndex == question.correctOptionIndex;
-
+      
       // NEU: Speichere Antwort mit Question ID (als String)
       // Hier müssen wir die Question ID haben - müssen wir zur Question-Klasse hinzufügen
       // Für jetzt: nur tracking
@@ -584,6 +631,7 @@ class _QuizScreenState extends State<QuizScreen> {
       setState(() {
         _currentQuestionIndex = index;
         _answerSubmitted = false; // Zurücksetzen für neue Frage
+        _answerConfirmed = false; // Zurücksetzen Bestätigung
       });
       _scrollController.animateTo(
         0,
@@ -602,7 +650,21 @@ class _QuizScreenState extends State<QuizScreen> {
       setState(() {
         _quizFinished = true;
       });
-      _finishSession();
+      _finishSessionAndShowResults();
+    }
+  }
+
+  Future<void> _finishSessionAndShowResults() async {
+    try {
+      _quizTimer.cancel(); // NEU: Stoppe Timer
+      debugPrint('🎬 Starting session finish sequence...');
+      await _finishSession();
+      debugPrint('✅ Session finished successfully');
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('❌ Error finishing session: $e');
     }
   }
 
@@ -610,11 +672,26 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_sessionId == null || widget.submoduleId == null) return;
     try {
       final provider = Provider.of<BackendProvider>(context, listen: false);
+      final durationMinutes = _elapsedSeconds ~/ 60; // Konvertiere zu Minuten
+
+      debugPrint('⏱️ Quiz beendet: $_elapsedSeconds Sekunden = $durationMinutes Minuten');
+      debugPrint('✅ Korrekte Antworten: $_correctAnswers/${_questions.length}');
+
       await provider.finishLearningSession(
         _sessionId!,
         total: _questions.length,
         correct: _correctAnswers,
+        submoduleId: widget.submoduleId, // NEU: Übergebe Submodule ID
+        durationMinutes: durationMinutes, // NEU: Sende die Zeit
       );
+
+      // NEU: Aktualisiere Fortschritte nach dem Beenden der Session
+      debugPrint('🔄 Aktualisiere Fortschritte nach Quiz-Session...');
+      await provider.updateSubmoduleProgress(widget.submoduleId);
+      if (widget.module.id != null) {
+        await provider.updateModuleProgress(widget.module.id);
+      }
+      debugPrint('✅ Fortschritte aktualisiert');
     } catch (e) {
       debugPrint('Failed to finish session: $e');
     }
@@ -634,17 +711,42 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
-  void _retryLesson() {
+  void _backToResultsOverlay() {
+    setState(() {
+      _isReviewMode = false;
+      _quizFinished = true;
+      _answerSubmitted = false;
+      _answerConfirmed = false;
+    });
+  }
+
+  Future<void> _retryLesson() async {
+    Set<int> masteredIds = {};
+    if (widget.submoduleId != null) {
+      final provider = Provider.of<BackendProvider>(context, listen: false);
+      masteredIds = await provider.getMasteredQuestionIdsForSubmodule(
+        widget.submoduleId,
+      );
+    }
+
+    final filteredQuestions = widget.lesson.quizQuestions.where((q) {
+      if (q.id == null) return true;
+      return !masteredIds.contains(q.id);
+    }).toList();
+
     setState(() {
       _quizFinished = false;
       _isReviewMode = false;
       _currentQuestionIndex = 0;
       _correctAnswers = 0;
       _answerSubmitted = false;
+      _answerConfirmed = false;
+      _elapsedSeconds = 0; // NEU: Reset Timer
 
-      _questions = widget.lesson.quizQuestions.map((q) {
+      _questions = filteredQuestions.map((q) {
         final correctIndex = _getCorrectIndex(q.options);
         return Question(
+          id: q.id, // ✅ WICHTIG: ID mitkopieren!
           questionText: q.questionText,
           options: q.options,
           selectedOptionIndex: null,
@@ -655,10 +757,45 @@ class _QuizScreenState extends State<QuizScreen> {
       _scrollController.jumpTo(0);
     });
     _startSession(); // Neue Session starten
+    _startQuizTimer(); // NEU: Starte Timer neu
   }
 
-  void _backToHome() {
-    Navigator.pushNamed(context, '/home');
+  Future<void> _backToModule() async {
+    final provider = Provider.of<BackendProvider>(context, listen: false);
+    await provider.refreshAllProgress();
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _confirmExitLesson() async {
+    if (!mounted) return;
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Session verlassen?'),
+          content: const Text(
+            'Wenn du die Session verlässt, gehen deine bisherigen Fortschritte verloren. Möchtest du wirklich verlassen?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Weiterlernen'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Verlassen'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -724,7 +861,9 @@ class _QuizScreenState extends State<QuizScreen> {
                             children: [
                               // Exit Lesson / Back to Results Button
                               GestureDetector(
-                                onTap: () => Navigator.pop(context),
+                                onTap: () => _isReviewMode
+                                    ? _backToModule()
+                                    : _confirmExitLesson(),
                                 child: Row(
                                   children: [
                                     const Icon(
@@ -735,7 +874,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     const SizedBox(width: 8),
                                     Text(
                                       _isReviewMode
-                                          ? 'Back to Results'
+                                          ? 'Back to Module'
                                           : 'Exit Lesson',
                                       style: const TextStyle(
                                         color: Colors.white70,
@@ -757,22 +896,22 @@ class _QuizScreenState extends State<QuizScreen> {
                                     size: 16,
                                   ),
                                   const SizedBox(width: 4),
-                                  const Text(
-                                    '01:02',
-                                    style: TextStyle(
+                                  Text(
+                                    _formatTime(_elapsedSeconds),
+                                    style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 13,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   const Icon(
-                                    Icons.quiz_outlined,
+                                    Icons.check_circle_outline,
                                     color: Colors.white70,
                                     size: 16,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '0/$totalQuestions',
+                                    '${_correctAnswers}/$totalQuestions',
                                     style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 13,
@@ -844,13 +983,19 @@ class _QuizScreenState extends State<QuizScreen> {
                                     ),
                                     const SizedBox(height: 15),
 
-                                    // Progress Bar und Text
-                                    Text(
-                                      'Progress Question $questionNumber of $totalQuestions',
-                                      style: const TextStyle(
-                                        color: Colors.black54,
-                                        fontSize: 14,
-                                      ),
+                                    // Progress Bar und Timer
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Progress Question $questionNumber of $totalQuestions',
+                                          style: const TextStyle(
+                                            color: Colors.black54,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+
+                                      ],
                                     ),
                                     const SizedBox(height: 8),
                                     LinearProgressIndicator(
@@ -962,18 +1107,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(15),
                                     decoration: BoxDecoration(
-                                      color:
-                                          (_questions[_currentQuestionIndex]
-                                                  .selectedOptionIndex ==
+                                      color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
                                               _questions[_currentQuestionIndex]
                                                   .correctOptionIndex)
                                           ? Colors.green.shade50
                                           : Colors.red.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color:
-                                            (_questions[_currentQuestionIndex]
-                                                    .selectedOptionIndex ==
+                                        color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
                                                 _questions[_currentQuestionIndex]
                                                     .correctOptionIndex)
                                             ? Colors.green.shade200
@@ -985,15 +1126,12 @@ class _QuizScreenState extends State<QuizScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Icon(
-                                          (_questions[_currentQuestionIndex]
-                                                      .selectedOptionIndex ==
+                                          (_questions[_currentQuestionIndex].selectedOptionIndex ==
                                                   _questions[_currentQuestionIndex]
                                                       .correctOptionIndex)
                                               ? Icons.check_circle
                                               : Icons.cancel,
-                                          color:
-                                              (_questions[_currentQuestionIndex]
-                                                      .selectedOptionIndex ==
+                                          color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
                                                   _questions[_currentQuestionIndex]
                                                       .correctOptionIndex)
                                               ? Colors.green
@@ -1003,8 +1141,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            (_questions[_currentQuestionIndex]
-                                                        .selectedOptionIndex ==
+                                            (_questions[_currentQuestionIndex].selectedOptionIndex ==
                                                     _questions[_currentQuestionIndex]
                                                         .correctOptionIndex)
                                                 ? 'Correct!'
@@ -1012,9 +1149,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color:
-                                                  (_questions[_currentQuestionIndex]
-                                                          .selectedOptionIndex ==
+                                              color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
                                                       _questions[_currentQuestionIndex]
                                                           .correctOptionIndex)
                                                   ? Colors.green
@@ -1027,8 +1162,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                 ),
 
-                              // Erklärungen nach Antwort oder im Review Mode
-                              if ((_answerSubmitted || _isReviewMode) &&
+                              // Erklärungen NUR nach OK oder im Review Mode
+                              if ((_answerConfirmed || _isReviewMode) &&
                                   currentQuestion.explanation != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 20),
@@ -1092,7 +1227,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               ),
                             ),
 
-                            // 2. Previous / Next Buttons
+                            // 2. Previous / OK / Next Buttons
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -1126,30 +1261,52 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                 ),
 
-                                // Next Button / Finish Button (nur wenn Antwort gegeben)
+                                // OK Button (Mitte) - nur wenn Antwort ausgewählt aber noch nicht bestätigt
+                                if (!_isReviewMode && !_answerSubmitted && _questions[_currentQuestionIndex].selectedOptionIndex != null)
+                                  SizedBox(
+                                    width: isSmallScreen ? 70 : 100,
+                                    child: ElevatedButton(
+                                      onPressed: _confirmAnswer,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        elevation: 2,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(15),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 15,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'OK',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                // Next Button / Finish Button (nur wenn Antwort bestätigt)
                                 SizedBox(
                                   width: isSmallScreen ? 90 : 140,
                                   child: ElevatedButton.icon(
-                                    onPressed:
-                                        (_answerSubmitted || _isReviewMode)
+                                    onPressed: (_answerSubmitted || _isReviewMode)
                                         ? _goToNextQuestion
-                                        : null, // NEU: Disabled bis Antwort gegeben
+                                        : null, // NEU: Disabled bis Antwort bestätigt
                                     icon: Icon(
-                                      _currentQuestionIndex ==
-                                              totalQuestions - 1
+                                      _currentQuestionIndex == totalQuestions - 1
                                           ? Icons.check
                                           : Icons.arrow_forward_ios,
                                       size: 16,
                                       color: Colors.white,
                                     ),
                                     label: Text(
-                                      _currentQuestionIndex ==
-                                              totalQuestions - 1
+                                      _currentQuestionIndex == totalQuestions - 1
                                           ? 'Finish'
                                           : 'Next',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
+                                      style: const TextStyle(color: Colors.white),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,
@@ -1167,6 +1324,29 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ),
                               ],
                             ),
+
+                            if (_isReviewMode)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12.0),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _backToResultsOverlay,
+                                    icon: const Icon(Icons.arrow_back, size: 16),
+                                    label: const Text('Back to Results'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blueGrey,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -1185,9 +1365,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 correctAnswers: _correctAnswers,
                 totalQuestions: totalQuestions,
                 title: widget.module.title,
+                durationSeconds: _elapsedSeconds,
                 onReviewAnswers: _startReviewMode,
                 onRetryLesson: _retryLesson,
-                onBackToHome: _backToHome,
+                onBackToModule: _backToModule,
               ),
             ),
         ],
