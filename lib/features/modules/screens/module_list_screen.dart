@@ -341,9 +341,7 @@ class _ModuleCardState extends State<ModuleCard> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: widget.isSelected
-            ? Colors.blue.withOpacity(0.08)
-            : Colors.white,
+        color: widget.isSelected ? Colors.blue.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: widget.isSelected
             ? Border.all(color: Colors.blue, width: 1.5)
@@ -611,8 +609,9 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.delete_outline),
-                      onPressed: () =>
-                          _deleteSelectedModules(Provider.of<BackendProvider>(context, listen: false)),
+                      onPressed: () => _deleteSelectedModules(
+                        Provider.of<BackendProvider>(context, listen: false),
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.share),
@@ -685,21 +684,30 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                         );
                       }
 
-                      debugPrint('ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}');
+                      debugPrint(
+                        'ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}',
+                      );
 
                       // Laden der Fortschritte aus Supabase
                       return FutureBuilder<Map<int, Map<String, dynamic>>>(
-                        future: provider.loadUserProgressForModules(provider.lastModules),
+                        future: provider.loadUserProgressForModules(
+                          provider.lastModules,
+                        ),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: Padding(
-                              padding: EdgeInsets.all(24.0),
-                              child: CircularProgressIndicator(),
-                            ));
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
                           }
 
                           if (snapshot.hasError) {
-                            debugPrint('❌ Error loading progress: ${snapshot.error}');
+                            debugPrint(
+                              '❌ Error loading progress: ${snapshot.error}',
+                            );
                             // Fallback ohne Fortschritte
                             return _buildModuleList(provider.lastModules, {});
                           }
@@ -709,7 +717,8 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                               ? provider.lastModules
                               : provider.lastModules.where((m) {
                                   final name = m.name.toLowerCase();
-                                  final desc = (m.description ?? '').toLowerCase();
+                                  final desc = (m.description ?? '')
+                                      .toLowerCase();
                                   final q = _query.toLowerCase();
                                   return name.contains(q) || desc.contains(q);
                                 }).toList();
@@ -771,7 +780,8 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
         return ModuleCard(
           module: module,
           selectionMode: _selectionMode,
-          isSelected: module.id != null && _selectedModuleIds.contains(module.id),
+          isSelected:
+              module.id != null && _selectedModuleIds.contains(module.id),
           onTap: () {
             if (_selectionMode) {
               _toggleModuleSelection(module.id);

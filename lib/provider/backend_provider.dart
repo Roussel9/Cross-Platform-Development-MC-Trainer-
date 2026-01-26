@@ -52,7 +52,7 @@ class BackendProvider with ChangeNotifier {
 
   // Listen & Status
   List<LernenModule> allModules = []; // pour Modules page
-  List<LernenModule> lastModule = []; // pour Home page
+  List<LernenModule> lastModules = [];
   Map<String, dynamic>? lastSession;
   List<Achievement> myAchievements = [];
   List<AppNotification> notifications = [];
@@ -78,11 +78,13 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      final rows = await _supabase
-          .from('user_notifications')
-          .select('title,message,created_at,is_read')
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false) as List<dynamic>;
+      final rows =
+          await _supabase
+                  .from('user_notifications')
+                  .select('title,message,created_at,is_read')
+                  .eq('user_id', user.id)
+                  .order('created_at', ascending: false)
+              as List<dynamic>;
 
       notifications = rows.map((row) {
         final data = row as Map<String, dynamic>;
@@ -110,7 +112,9 @@ class BackendProvider with ChangeNotifier {
         'title': title,
         'message': message,
         'is_read': false,
-        'created_at': DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+        'created_at': DateTime.now()
+            .add(const Duration(hours: 1))
+            .toIso8601String(),
       });
 
       await fetchNotifications();
@@ -628,7 +632,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-   //  Profil aktualisieren
+  //  Profil aktualisieren
   Future<bool> updateProfile({
     required String name,
     required String email,
@@ -761,17 +765,18 @@ class BackendProvider with ChangeNotifier {
       debugPrint('fetchModules: querying supabase modules table...');
       final user = _supabase.auth.currentUser;
 
-      final defaultModules = await _supabase
-          .from('modules')
-          .select('*')
-          .eq('default', true) as List<dynamic>;
+      final defaultModules =
+          await _supabase.from('modules').select('*').eq('default', true)
+              as List<dynamic>;
 
       List<dynamic> importedModules = [];
       if (user != null) {
-        final imported = await _supabase
-            .from('imported_modules')
-            .select('module_id')
-            .eq('user_id', user.id) as List<dynamic>;
+        final imported =
+            await _supabase
+                    .from('imported_modules')
+                    .select('module_id')
+                    .eq('user_id', user.id)
+                as List<dynamic>;
 
         final importedIds = imported
             .map((row) => row['module_id'])
@@ -779,10 +784,12 @@ class BackendProvider with ChangeNotifier {
             .toList();
 
         if (importedIds.isNotEmpty) {
-          importedModules = await _supabase
-              .from('modules')
-              .select('*')
-              .inFilter('id', importedIds) as List<dynamic>;
+          importedModules =
+              await _supabase
+                      .from('modules')
+                      .select('*')
+                      .inFilter('id', importedIds)
+                  as List<dynamic>;
         }
       }
 
@@ -793,8 +800,8 @@ class BackendProvider with ChangeNotifier {
         final idInt = (idVal is int)
             ? idVal
             : (idVal is num
-                ? idVal.toInt()
-                : int.tryParse(idVal?.toString() ?? '0') ?? 0);
+                  ? idVal.toInt()
+                  : int.tryParse(idVal?.toString() ?? '0') ?? 0);
         combined[idInt] = m;
       }
 
@@ -860,107 +867,119 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-/// Berechnet den Fortschritt eines Submoduls basierend auf den Karten (Level)
-/// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
-Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
-  try {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return 0.0;
+  /// Berechnet den Fortschritt eines Submoduls basierend auf den Karten (Level)
+  /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
+  Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 0.0;
 
-    // Wenn Submodule bereits als completed markiert ist, zeige 100%
-    final submoduleCheck = await _supabase
-        .from('submodules')
-        .select('iscompleted')
-        .eq('id', submoduleId) as List<dynamic>;
+      // Wenn Submodule bereits als completed markiert ist, zeige 100%
+      final submoduleCheck =
+          await _supabase
+                  .from('submodules')
+                  .select('iscompleted')
+                  .eq('id', submoduleId)
+              as List<dynamic>;
 
-    if (submoduleCheck.isNotEmpty) {
-      final isCompleted = submoduleCheck.first['iscompleted'] as bool?;
-      if (isCompleted == true) {
-        return 1.0;
-      }
-    }
-
-    // 1. Verwende die beste Session-Accuracy (damit sich die Note nicht verschlechtert)
-    final bestSession = await _supabase
-        .from('learning_sessions')
-        .select('accuracy_percentage')
-        .eq('user_id', user.id)
-        .eq('submodules_id', submoduleId)
-        .order('accuracy_percentage', ascending: false)
-        .limit(1)
-        .maybeSingle() as Map<String, dynamic>?;
-
-    if (bestSession != null && bestSession['accuracy_percentage'] != null) {
-      final accuracy = (bestSession['accuracy_percentage'] as num).toDouble();
-      final progress = (accuracy / 100.0).clamp(0.0, 1.0);
-      debugPrint(
-        '📊 Submodule $submoduleId: best accuracy = ${accuracy.toStringAsFixed(1)}%',
-      );
-      return progress;
-    }
-
-    // 2. Versuche Fortschritt aus Level-Tabelle zu berechnen (cards_answered)
-    final levelProgressList = await _supabase
-        .from('user_submodule_level_progress')
-        .select('total_cards_in_level,cards_answered,cards_mastered')
-        .eq('user_id', user.id)
-        .eq('submodule_id', submoduleId) as List<dynamic>;
-
-    if (levelProgressList.isNotEmpty) {
-      int totalCards = 0;
-      int answeredCards = 0;
-
-      for (final level in levelProgressList) {
-        final total = (level['total_cards_in_level'] as int?) ?? 0;
-        if (total <= 0) continue;
-        totalCards += total;
-        final answered = (level['cards_answered'] as int?) ??
-            (level['cards_mastered'] as int?) ??
-            0;
-        answeredCards += answered;
+      if (submoduleCheck.isNotEmpty) {
+        final isCompleted = submoduleCheck.first['iscompleted'] as bool?;
+        if (isCompleted == true) {
+          return 1.0;
+        }
       }
 
-      if (totalCards > 0) {
-        final progress = (answeredCards / totalCards).clamp(0.0, 1.0);
+      // 1. Verwende die beste Session-Accuracy (damit sich die Note nicht verschlechtert)
+      final bestSession =
+          await _supabase
+                  .from('learning_sessions')
+                  .select('accuracy_percentage')
+                  .eq('user_id', user.id)
+                  .eq('submodules_id', submoduleId)
+                  .order('accuracy_percentage', ascending: false)
+                  .limit(1)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+
+      if (bestSession != null && bestSession['accuracy_percentage'] != null) {
+        final accuracy = (bestSession['accuracy_percentage'] as num).toDouble();
+        final progress = (accuracy / 100.0).clamp(0.0, 1.0);
         debugPrint(
-          '📊 Submodule $submoduleId: $answeredCards/$totalCards answered = ${(progress * 100).toStringAsFixed(1)}%',
+          '📊 Submodule $submoduleId: best accuracy = ${accuracy.toStringAsFixed(1)}%',
         );
         return progress;
       }
+
+      // 2. Versuche Fortschritt aus Level-Tabelle zu berechnen (cards_answered)
+      final levelProgressList =
+          await _supabase
+                  .from('user_submodule_level_progress')
+                  .select('total_cards_in_level,cards_answered,cards_mastered')
+                  .eq('user_id', user.id)
+                  .eq('submodule_id', submoduleId)
+              as List<dynamic>;
+
+      if (levelProgressList.isNotEmpty) {
+        int totalCards = 0;
+        int answeredCards = 0;
+
+        for (final level in levelProgressList) {
+          final total = (level['total_cards_in_level'] as int?) ?? 0;
+          if (total <= 0) continue;
+          totalCards += total;
+          final answered =
+              (level['cards_answered'] as int?) ??
+              (level['cards_mastered'] as int?) ??
+              0;
+          answeredCards += answered;
+        }
+
+        if (totalCards > 0) {
+          final progress = (answeredCards / totalCards).clamp(0.0, 1.0);
+          debugPrint(
+            '📊 Submodule $submoduleId: $answeredCards/$totalCards answered = ${(progress * 100).toStringAsFixed(1)}%',
+          );
+          return progress;
+        }
+      }
+
+      // 3. Fallback: Fortschritt anhand beantworteter Fragen berechnen
+      final questionsResponse =
+          await _supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('submodule_id', submoduleId)
+              as List<dynamic>;
+
+      if (questionsResponse.isEmpty) return 0.0;
+
+      final questionIds = questionsResponse.map((c) => c['id']).toList();
+      debugPrint(
+        '📊 Submodule $submoduleId: ${questionIds.length} total questions',
+      );
+
+      final userProgressResponse =
+          await _supabase
+                  .from('user_card_progress')
+                  .select('question_id')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
+
+      final answeredCount = userProgressResponse
+          .where((p) => questionIds.contains(p['question_id']))
+          .length;
+
+      final progress = answeredCount / questionIds.length;
+      debugPrint(
+        '📊 Submodule $submoduleId: $answeredCount/${questionIds.length} answered = ${(progress * 100).toStringAsFixed(1)}%',
+      );
+
+      return progress;
+    } catch (e) {
+      debugPrint('❌ Error calculating submodule progress: $e');
+      return 0.0;
     }
-
-    // 3. Fallback: Fortschritt anhand beantworteter Fragen berechnen
-    final questionsResponse = await _supabase
-        .from('questions')
-        .select('id')
-        .eq('submodule_id', submoduleId) as List<dynamic>;
-
-    if (questionsResponse.isEmpty) return 0.0;
-
-    final questionIds = questionsResponse.map((c) => c['id']).toList();
-    debugPrint('📊 Submodule $submoduleId: ${questionIds.length} total questions');
-
-    final userProgressResponse = await _supabase
-        .from('user_card_progress')
-        .select('question_id')
-        .eq('user_id', user.id) as List<dynamic>;
-
-    final answeredCount = userProgressResponse
-        .where((p) => questionIds.contains(p['question_id']))
-        .length;
-
-    final progress = answeredCount / questionIds.length;
-    debugPrint(
-      '📊 Submodule $submoduleId: $answeredCount/${questionIds.length} answered = ${(progress * 100).toStringAsFixed(1)}%',
-    );
-
-    return progress;
-  } catch (e) {
-    debugPrint('❌ Error calculating submodule progress: $e');
-    return 0.0;
   }
-}
-
 
   /// Berechnet den Fortschritt eines Levels basierend auf gemeisterten Karten
   /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
@@ -973,13 +992,15 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       if (user == null) return 0.0;
 
       // Lade den Level-Fortschritt
-      final levelProgress = await _supabase
-          .from('user_submodule_level_progress')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('submodule_id', submoduleId)
-          .eq('level_number', levelNumber)
-          .maybeSingle() as Map<String, dynamic>?;
+      final levelProgress =
+          await _supabase
+                  .from('user_submodule_level_progress')
+                  .select('*')
+                  .eq('user_id', user.id)
+                  .eq('submodule_id', submoduleId)
+                  .eq('level_number', levelNumber)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       if (levelProgress == null) return 0.0;
 
@@ -1023,16 +1044,20 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
 
         for (var submodule in submodules) {
           final submoduleId = submodule['id'];
-          final submoduleProgress = await calculateSubmoduleProgress(submoduleId);
+          final submoduleProgress = await calculateSubmoduleProgress(
+            submoduleId,
+          );
           final isCompleted = await isSubmoduleCompleted(submoduleId);
 
           // Lade Level-Fortschritte
-          final levelProgressList = await _supabase
-              .from('user_submodule_level_progress')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('submodule_id', submoduleId)
-              .order('level_number', ascending: true) as List<dynamic>;
+          final levelProgressList =
+              await _supabase
+                      .from('user_submodule_level_progress')
+                      .select('*')
+                      .eq('user_id', user.id)
+                      .eq('submodule_id', submoduleId)
+                      .order('level_number', ascending: true)
+                  as List<dynamic>;
 
           submoduleProgressMap[submoduleId as int] = {
             'progress': submoduleProgress,
@@ -1066,7 +1091,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     try {
       debugPrint('🔄 Aktualisiere Fortschritt für Modul $moduleId...');
       final progress = await calculateModuleProgress(moduleId);
-      debugPrint('✅ Modul $moduleId: ${(progress * 100).toStringAsFixed(1)}% Fortschritt');
+      debugPrint(
+        '✅ Modul $moduleId: ${(progress * 100).toStringAsFixed(1)}% Fortschritt',
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Error updating module progress: $e');
@@ -1078,7 +1105,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     try {
       debugPrint('🔄 Aktualisiere Fortschritt für Submodul $submoduleId...');
       final progress = await calculateSubmoduleProgress(submoduleId);
-      debugPrint('✅ Submodul $submoduleId: ${(progress * 100).toStringAsFixed(1)}% Fortschritt');
+      debugPrint(
+        '✅ Submodul $submoduleId: ${(progress * 100).toStringAsFixed(1)}% Fortschritt',
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Error updating submodule progress: $e');
@@ -1100,7 +1129,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
   }
 
   /// Gibt eine detaillierte Fortschritts-Zusammenfassung für ein Submodule zurück
-  Future<Map<String, dynamic>> getSubmoduleProgressSummary(dynamic submoduleId) async {
+  Future<Map<String, dynamic>> getSubmoduleProgressSummary(
+    dynamic submoduleId,
+  ) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return {};
@@ -1109,12 +1140,14 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       final isCompleted = await isSubmoduleCompleted(submoduleId);
 
       // Lade Level-Details
-      final levelProgressList = await _supabase
-          .from('user_submodule_level_progress')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('submodule_id', submoduleId)
-          .order('level_number', ascending: true) as List<dynamic>;
+      final levelProgressList =
+          await _supabase
+                  .from('user_submodule_level_progress')
+                  .select('*')
+                  .eq('user_id', user.id)
+                  .eq('submodule_id', submoduleId)
+                  .order('level_number', ascending: true)
+              as List<dynamic>;
 
       int totalLevels = levelProgressList.length;
       int unlockedLevels = 0;
@@ -1146,7 +1179,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
   }
 
   /// Gibt eine detaillierte Fortschritts-Zusammenfassung für ein Modul zurück
-  Future<Map<String, dynamic>> getModuleProgressSummary(dynamic moduleId) async {
+  Future<Map<String, dynamic>> getModuleProgressSummary(
+    dynamic moduleId,
+  ) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return {};
@@ -1253,62 +1288,78 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       if (user == null) return false;
 
       // Zuerst prüfe ob `iscompleted` in der Datenbank true ist
-      final submoduleCheck = await _supabase
-          .from('submodules')
-          .select('iscompleted')
-          .eq('id', submoduleId) as List<dynamic>;
+      final submoduleCheck =
+          await _supabase
+                  .from('submodules')
+                  .select('iscompleted')
+                  .eq('id', submoduleId)
+              as List<dynamic>;
 
       if (submoduleCheck.isNotEmpty) {
         final isCompleted = submoduleCheck.first['iscompleted'] as bool?;
         if (isCompleted == true) {
-          debugPrint('✅ Submodule $submoduleId: Bereits als completed markiert');
+          debugPrint(
+            '✅ Submodule $submoduleId: Bereits als completed markiert',
+          );
           return true;
         }
       }
 
       // Prüfe beste Session-Accuracy
-      final bestSession = await _supabase
-          .from('learning_sessions')
-          .select('accuracy_percentage')
-          .eq('user_id', user.id)
-          .eq('submodules_id', submoduleId)
-          .order('accuracy_percentage', ascending: false)
-          .limit(1)
-          .maybeSingle() as Map<String, dynamic>?;
+      final bestSession =
+          await _supabase
+                  .from('learning_sessions')
+                  .select('accuracy_percentage')
+                  .eq('user_id', user.id)
+                  .eq('submodules_id', submoduleId)
+                  .order('accuracy_percentage', ascending: false)
+                  .limit(1)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       if (bestSession != null && bestSession['accuracy_percentage'] != null) {
         final accuracy = (bestSession['accuracy_percentage'] as num).toDouble();
         if (accuracy >= 80.0) {
-          debugPrint('✅ Submodule $submoduleId: best accuracy ${accuracy.toStringAsFixed(1)}%');
+          debugPrint(
+            '✅ Submodule $submoduleId: best accuracy ${accuracy.toStringAsFixed(1)}%',
+          );
           return true;
         }
       }
 
       // Lade alle Cards für dieses Submodule
-      final cards = await _supabase
-          .from('questions')
-          .select('id')
-          .eq('submodule_id', submoduleId) as List<dynamic>;
+      final cards =
+          await _supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('submodule_id', submoduleId)
+              as List<dynamic>;
 
       if (cards.isEmpty) return true;
 
       final cardIds = cards.map((c) => c['id']).toList();
 
       // Prüfe wie viele Cards der Nutzer gemeistert hat
-        final userProgress = await _supabase
-          .from('user_card_progress')
-          .select('question_id,is_mastered')
-          .eq('user_id', user.id) as List<dynamic>;
+      final userProgress =
+          await _supabase
+                  .from('user_card_progress')
+                  .select('question_id,is_mastered')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
 
-        final masteredCount = userProgress
-          .where((p) =>
-            (p['is_mastered'] == true) &&
-            cardIds.contains(p['question_id']))
+      final masteredCount = userProgress
+          .where(
+            (p) =>
+                (p['is_mastered'] == true) &&
+                cardIds.contains(p['question_id']),
+          )
           .length;
 
       // Completed wenn mindestens 80% gemeistert
       final completion = (masteredCount / cardIds.length) * 100;
-      debugPrint('✅ Submodule $submoduleId: $masteredCount/${cardIds.length} mastered = ${completion.toStringAsFixed(1)}%');
+      debugPrint(
+        '✅ Submodule $submoduleId: $masteredCount/${cardIds.length} mastered = ${completion.toStringAsFixed(1)}%',
+      );
       return completion >= 80.0;
     } catch (e) {
       debugPrint('❌ Error checking submodule completion: $e');
@@ -1401,11 +1452,13 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       }
 
       // Entferne Karten, die bereits 6x in Folge richtig beantwortet wurden
-      final mastered = await _supabase
-          .from('user_card_progress')
-          .select('question_id')
-          .eq('user_id', user.id)
-          .eq('is_mastered', true) as List<dynamic>;
+      final mastered =
+          await _supabase
+                  .from('user_card_progress')
+                  .select('question_id')
+                  .eq('user_id', user.id)
+                  .eq('is_mastered', true)
+              as List<dynamic>;
 
       final masteredIds = mastered.map((m) => m['question_id']).toSet();
       final filtered = questions
@@ -1424,25 +1477,31 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
   }
 
   // --- Mastered Questions (6er-Streak) für Submodul laden ---
-  Future<Set<int>> getMasteredQuestionIdsForSubmodule(dynamic submoduleId) async {
+  Future<Set<int>> getMasteredQuestionIdsForSubmodule(
+    dynamic submoduleId,
+  ) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return {};
 
-      final questions = await _supabase
-          .from('questions')
-          .select('id')
-          .eq('submodule_id', submoduleId) as List<dynamic>;
+      final questions =
+          await _supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('submodule_id', submoduleId)
+              as List<dynamic>;
 
       if (questions.isEmpty) return {};
 
       final questionIds = questions.map((q) => q['id']).toSet();
 
-      final mastered = await _supabase
-          .from('user_card_progress')
-          .select('question_id')
-          .eq('user_id', user.id)
-          .eq('is_mastered', true) as List<dynamic>;
+      final mastered =
+          await _supabase
+                  .from('user_card_progress')
+                  .select('question_id')
+                  .eq('user_id', user.id)
+                  .eq('is_mastered', true)
+              as List<dynamic>;
 
       final masteredIds = mastered.map((m) => m['question_id']).toSet();
 
@@ -1509,23 +1568,26 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       final user = _supabase.auth.currentUser;
       if (user == null) return null;
 
-      debugPrint('📌 Starte Learning Session für Submodule: $submoduleId (Type: ${submoduleId.runtimeType})');
+      debugPrint(
+        '📌 Starte Learning Session für Submodule: $submoduleId (Type: ${submoduleId.runtimeType})',
+      );
 
       // Erstelle Learning Session OHNE submodule_id (diese kommt in submodules_per_session)
-      final insert = await _supabase
-          .from('learning_sessions')
-          .insert({
-            'user_id': user.id,
-            'start_time': DateTime.now().add(const Duration(hours: 1)).toIso8601String() ,
-            'total_questions': 0,
-            'correct_answered': 0,
-            'incorrect_answered': 0,
-            'accuracy_percentage': 0,
-            'status': 'active',
-            'timer_duration_minutes': 0,
-            'submodules_id': int.parse(submoduleId.toString()),
-          })
-          .select() as List<dynamic>;
+      final insert =
+          await _supabase.from('learning_sessions').insert({
+                'user_id': user.id,
+                'start_time': DateTime.now()
+                    .add(const Duration(hours: 1))
+                    .toIso8601String(),
+                'total_questions': 0,
+                'correct_answered': 0,
+                'incorrect_answered': 0,
+                'accuracy_percentage': 0,
+                'status': 'active',
+                'timer_duration_minutes': 0,
+                'submodules_id': int.parse(submoduleId.toString()),
+              }).select()
+              as List<dynamic>;
 
       final session = insert.first as Map<String, dynamic>;
       final sessionId = session['id']?.toString();
@@ -1539,7 +1601,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
           'submodule_id': int.parse(submoduleId.toString()),
         });
         debugPrint('✅ Learning Session erstellt: $sessionId');
-        debugPrint('✅ Submodule Link gespeichert: Session=$sessionId, Submodule=$submoduleId');
+        debugPrint(
+          '✅ Submodule Link gespeichert: Session=$sessionId, Submodule=$submoduleId',
+        );
       }
 
       lastSession = session;
@@ -1566,7 +1630,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
 
       final wasCompleted = await isSubmoduleCompleted(submoduleId);
 
-      debugPrint('✅ finishLearningSession: sessionId=$sessionId, total=$total, correct=$correct, duration=${durationMinutes}min, accuracy=$accuracy%');
+      debugPrint(
+        '✅ finishLearningSession: sessionId=$sessionId, total=$total, correct=$correct, duration=${durationMinutes}min, accuracy=$accuracy%',
+      );
 
       await _supabase
           .from('learning_sessions')
@@ -1582,12 +1648,15 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
           })
           .eq('id', sessionId);
 
-      debugPrint('✅ Session saved to database with duration: $durationMinutes minutes');
-
+      debugPrint(
+        '✅ Session saved to database with duration: $durationMinutes minutes',
+      );
 
       if (accuracy >= 80) {
         await markSubmoduleAsCompleted(submoduleId);
-        debugPrint('🎉 Submodule $submoduleId erfolgreich als completed markiert!');
+        debugPrint(
+          '🎉 Submodule $submoduleId erfolgreich als completed markiert!',
+        );
 
         if (!wasCompleted) {
           await addNotification(
@@ -1601,7 +1670,9 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
           );
         }
       } else {
-        debugPrint('⚠️ Nur $accuracy% erreicht - Submodule nicht als completed markiert (benötigt 80%)');
+        debugPrint(
+          '⚠️ Nur $accuracy% erreicht - Submodule nicht als completed markiert (benötigt 80%)',
+        );
       }
 
       //  Setze is_completed in user_submodule_level_progress bei 100%
@@ -1644,13 +1715,13 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       if (user == null) return;
 
       // hole bestehenden Fortschritt
-        final existing =
+      final existing =
           await _supabase
-              .from('user_card_progress')
-              .select()
-              .eq('user_id', user.id)
-              .eq('question_id', cardId)
-            as List<dynamic>;
+                  .from('user_card_progress')
+                  .select()
+                  .eq('user_id', user.id)
+                  .eq('question_id', cardId)
+              as List<dynamic>;
 
       Map<String, dynamic>? progress = existing.isNotEmpty
           ? existing.first as Map<String, dynamic>
@@ -1739,18 +1810,18 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
       // Anzahl gemeisterter Karten durch Nutzer
       final allCardIds = allCards.map((e) => e['id']).toList();
 
-        final userProgress =
+      final userProgress =
           await _supabase
-              .from('user_card_progress')
-              .select('id,question_id,is_mastered')
-              .eq('user_id', userId)
-            as List<dynamic>;
+                  .from('user_card_progress')
+                  .select('id,question_id,is_mastered')
+                  .eq('user_id', userId)
+              as List<dynamic>;
 
-        final mastered = userProgress
+      final mastered = userProgress
           .where(
-          (p) =>
-            (p['is_mastered'] == true) &&
-            allCardIds.contains(p['question_id']),
+            (p) =>
+                (p['is_mastered'] == true) &&
+                allCardIds.contains(p['question_id']),
           )
           .toList();
 
@@ -1831,14 +1902,14 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     if (allCards.isEmpty) return 0;
     try {
       final allCardIds = allCards.map((e) => e['id']).toList();
-        final userProgress =
+      final userProgress =
           await _supabase
-              .from('user_card_progress')
-              .select('id,question_id')
-              .eq('user_id', userId)
-            as List<dynamic>;
+                  .from('user_card_progress')
+                  .select('id,question_id')
+                  .eq('user_id', userId)
+              as List<dynamic>;
 
-        final answered = userProgress
+      final answered = userProgress
           .where((p) => allCardIds.contains(p['question_id']))
           .toList();
       return answered.length;
@@ -1850,181 +1921,5 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
   //  Clear-Methode für Logout
   void clearData() {
     reset();
-  }
-}
-
-// --- Home Screen ---
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  // --- StatCard Widget ---
-  Widget _buildStatCard({
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: AppColors.appHeaderBackgroundGradient,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryColorDark.withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 28),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => BackendProvider(),
-      child: Consumer<BackendProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (provider.error != null) {
-            return Scaffold(body: Center(child: Text(provider.error!)));
-          }
-
-          return Scaffold(
-            backgroundColor: Colors.black,
-            body: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // --- Begrüßung mit vollständigem Namen ---
-                        Text(
-                          'Welcome back, ${provider.userName}!',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Education is the passport to the future!',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildStatCard(
-                          icon: Icons.my_location_outlined,
-                          value: provider.questionsThisWeek.toString(),
-                          label: 'Questions this week',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.watch_later_outlined,
-                          value: '${provider.currentStreak} days',
-                          label: 'Current streak',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.workspace_premium_outlined,
-                          value: '${provider.modulesCompleted}/12',
-                          label: 'Modules completed',
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Continue where you left off',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        for (var module in provider.lastModules)
-                          QuizCard(
-                            moduleTitle: module.name,
-                            moduleDescription: module.description ?? '',
-                            progress: provider.calculateProgress(
-                              provider.lastSession,
-                            ),
-                            onResume: () {},
-                          ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Quick Actions',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        CategoryCard(
-                          icon: Icons.stacked_bar_chart,
-                          title: 'Browse Modules',
-                          subtitle: 'View all modules',
-                          iconColor: Colors.blue,
-                          onTap: () {
-                            Navigator.pushNamed(context, '/modules');
-                          },
-                        ),
-                        CategoryCard(
-                          icon: Icons.emoji_events_outlined,
-                          title: 'Achievements',
-                          subtitle: 'View your badges and rewards',
-                          iconColor: Colors.orange,
-                          onTap: () {},
-                        ),
-                        CategoryCard(
-                          icon: Icons.trending_up,
-                          title: 'Statistics',
-                          subtitle: 'Track your progress',
-                          iconColor: Colors.green,
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 }
