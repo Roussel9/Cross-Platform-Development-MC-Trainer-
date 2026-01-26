@@ -5,7 +5,6 @@ import 'package:mc_trainer_kami/core/constants/app_strings.dart';
 import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
-import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
 import 'package:mc_trainer_kami/provider/home_provider.dart';
 import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
 import '../../../main.dart';
@@ -360,8 +359,10 @@ class _HomeScreenState extends State<HomeScreen> {
           // Letzte Module anzeigen - mit dynamic Progress
           ...backend.lastModules.map(
             (module) => FutureBuilder<double>(
-              future: Provider.of<BackendProvider>(context, listen: false)
-                  .calculateModuleProgress(module.id ?? 0),
+              future: Provider.of<BackendProvider>(
+                context,
+                listen: false,
+              ).calculateModuleProgress(module.id ?? 0),
               builder: (context, progressSnapshot) {
                 final progress = progressSnapshot.data ?? 0.0;
                 return QuizCard(

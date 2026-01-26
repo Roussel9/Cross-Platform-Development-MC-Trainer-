@@ -462,7 +462,10 @@ class QuizResultOverlay extends StatelessWidget {
                         width: isSmallScreen ? double.infinity : buttonMaxWidth,
                         child: ElevatedButton.icon(
                           onPressed: onBackToModule,
-                          icon: const Icon(Icons.view_list, color: Colors.white),
+                          icon: const Icon(
+                            Icons.view_list,
+                            color: Colors.white,
+                          ),
                           label: const Text('Back to Module'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
@@ -594,9 +597,13 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _confirmAnswer() {
-    if (!_isReviewMode && !_answerSubmitted && _questions[_currentQuestionIndex].selectedOptionIndex != null) {
-      final selectedIndex = _questions[_currentQuestionIndex].selectedOptionIndex!;
-      final isCorrect = selectedIndex == _questions[_currentQuestionIndex].correctOptionIndex;
+    if (!_isReviewMode &&
+        !_answerSubmitted &&
+        _questions[_currentQuestionIndex].selectedOptionIndex != null) {
+      final selectedIndex =
+          _questions[_currentQuestionIndex].selectedOptionIndex!;
+      final isCorrect =
+          selectedIndex == _questions[_currentQuestionIndex].correctOptionIndex;
       setState(() {
         _answerSubmitted = true; // Zeige Feedback
         _answerConfirmed = true; // Markiere als bestätigt
@@ -613,7 +620,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final provider = Provider.of<BackendProvider>(context, listen: false);
       final question = _questions[_currentQuestionIndex];
       final isCorrect = selectedIndex == question.correctOptionIndex;
-      
+
       // NEU: Speichere Antwort mit Question ID (als String)
       // Hier müssen wir die Question ID haben - müssen wir zur Question-Klasse hinzufügen
       // Für jetzt: nur tracking
@@ -674,7 +681,9 @@ class _QuizScreenState extends State<QuizScreen> {
       final provider = Provider.of<BackendProvider>(context, listen: false);
       final durationMinutes = _elapsedSeconds ~/ 60; // Konvertiere zu Minuten
 
-      debugPrint('⏱️ Quiz beendet: $_elapsedSeconds Sekunden = $durationMinutes Minuten');
+      debugPrint(
+        '⏱️ Quiz beendet: $_elapsedSeconds Sekunden = $durationMinutes Minuten',
+      );
       debugPrint('✅ Korrekte Antworten: $_correctAnswers/${_questions.length}');
 
       await provider.finishLearningSession(
@@ -985,7 +994,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
                                     // Progress Bar und Timer
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           'Progress Question $questionNumber of $totalQuestions',
@@ -994,7 +1004,6 @@ class _QuizScreenState extends State<QuizScreen> {
                                             fontSize: 14,
                                           ),
                                         ),
-
                                       ],
                                     ),
                                     const SizedBox(height: 8),
@@ -1107,14 +1116,18 @@ class _QuizScreenState extends State<QuizScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(15),
                                     decoration: BoxDecoration(
-                                      color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                      color:
+                                          (_questions[_currentQuestionIndex]
+                                                  .selectedOptionIndex ==
                                               _questions[_currentQuestionIndex]
                                                   .correctOptionIndex)
                                           ? Colors.green.shade50
                                           : Colors.red.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                        color:
+                                            (_questions[_currentQuestionIndex]
+                                                    .selectedOptionIndex ==
                                                 _questions[_currentQuestionIndex]
                                                     .correctOptionIndex)
                                             ? Colors.green.shade200
@@ -1126,12 +1139,15 @@ class _QuizScreenState extends State<QuizScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Icon(
-                                          (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                          (_questions[_currentQuestionIndex]
+                                                      .selectedOptionIndex ==
                                                   _questions[_currentQuestionIndex]
                                                       .correctOptionIndex)
                                               ? Icons.check_circle
                                               : Icons.cancel,
-                                          color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                          color:
+                                              (_questions[_currentQuestionIndex]
+                                                      .selectedOptionIndex ==
                                                   _questions[_currentQuestionIndex]
                                                       .correctOptionIndex)
                                               ? Colors.green
@@ -1141,7 +1157,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                            (_questions[_currentQuestionIndex]
+                                                        .selectedOptionIndex ==
                                                     _questions[_currentQuestionIndex]
                                                         .correctOptionIndex)
                                                 ? 'Correct!'
@@ -1149,7 +1166,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: (_questions[_currentQuestionIndex].selectedOptionIndex ==
+                                              color:
+                                                  (_questions[_currentQuestionIndex]
+                                                          .selectedOptionIndex ==
                                                       _questions[_currentQuestionIndex]
                                                           .correctOptionIndex)
                                                   ? Colors.green
@@ -1262,7 +1281,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ),
 
                                 // OK Button (Mitte) - nur wenn Antwort ausgewählt aber noch nicht bestätigt
-                                if (!_isReviewMode && !_answerSubmitted && _questions[_currentQuestionIndex].selectedOptionIndex != null)
+                                if (!_isReviewMode &&
+                                    !_answerSubmitted &&
+                                    _questions[_currentQuestionIndex]
+                                            .selectedOptionIndex !=
+                                        null)
                                   SizedBox(
                                     width: isSmallScreen ? 70 : 100,
                                     child: ElevatedButton(
@@ -1272,7 +1295,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                         foregroundColor: Colors.white,
                                         elevation: 2,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
                                         ),
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 15,
@@ -1292,21 +1317,26 @@ class _QuizScreenState extends State<QuizScreen> {
                                 SizedBox(
                                   width: isSmallScreen ? 90 : 140,
                                   child: ElevatedButton.icon(
-                                    onPressed: (_answerSubmitted || _isReviewMode)
+                                    onPressed:
+                                        (_answerSubmitted || _isReviewMode)
                                         ? _goToNextQuestion
                                         : null, // NEU: Disabled bis Antwort bestätigt
                                     icon: Icon(
-                                      _currentQuestionIndex == totalQuestions - 1
+                                      _currentQuestionIndex ==
+                                              totalQuestions - 1
                                           ? Icons.check
                                           : Icons.arrow_forward_ios,
                                       size: 16,
                                       color: Colors.white,
                                     ),
                                     label: Text(
-                                      _currentQuestionIndex == totalQuestions - 1
+                                      _currentQuestionIndex ==
+                                              totalQuestions - 1
                                           ? 'Finish'
                                           : 'Next',
-                                      style: const TextStyle(color: Colors.white),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,
@@ -1332,7 +1362,10 @@ class _QuizScreenState extends State<QuizScreen> {
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
                                     onPressed: _backToResultsOverlay,
-                                    icon: const Icon(Icons.arrow_back, size: 16),
+                                    icon: const Icon(
+                                      Icons.arrow_back,
+                                      size: 16,
+                                    ),
                                     label: const Text('Back to Results'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blueGrey,
