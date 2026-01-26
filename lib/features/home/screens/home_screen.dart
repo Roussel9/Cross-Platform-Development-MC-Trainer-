@@ -346,13 +346,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // Letzte Module anzeigen
+          // Letzte Module anzeigen - mit dynamic Progress
           ...backend.lastModules.map(
-            (module) => QuizCard(
-              moduleTitle: module.name,
-              moduleDescription: module.description ?? '',
-              progress: 0.65,
-              onResume: () {},
+            (module) => FutureBuilder<double>(
+              future: Provider.of<BackendProvider>(context, listen: false)
+                  .calculateModuleProgress(module.id ?? 0),
+              builder: (context, progressSnapshot) {
+                final progress = progressSnapshot.data ?? 0.0;
+                return QuizCard(
+                  moduleTitle: module.name,
+                  moduleDescription: module.description ?? '',
+                  progress: progress,
+                  onResume: () {},
+                );
+              },
             ),
           ),
           const SizedBox(height: 24),
