@@ -514,7 +514,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _correctAnswers = 0;
   String? _sessionId; // NEU: für Session-Tracking
   bool _answerConfirmed = false; // NEU: Nutzer hat OK geklickt
-  
+
   // NEU: Timer für Quiz
   late Timer _quizTimer;
   int _elapsedSeconds = 0; // Verstrichene Sekunden
@@ -538,7 +538,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
     // NEU: Starte Learning Session in Supabase
     _startSession();
-    
+
     // NEU: Starte Timer
     _startQuizTimer();
   }
@@ -673,10 +673,10 @@ class _QuizScreenState extends State<QuizScreen> {
     try {
       final provider = Provider.of<BackendProvider>(context, listen: false);
       final durationMinutes = _elapsedSeconds ~/ 60; // Konvertiere zu Minuten
-      
+
       debugPrint('⏱️ Quiz beendet: $_elapsedSeconds Sekunden = $durationMinutes Minuten');
       debugPrint('✅ Korrekte Antworten: $_correctAnswers/${_questions.length}');
-      
+
       await provider.finishLearningSession(
         _sessionId!,
         total: _questions.length,
@@ -684,7 +684,7 @@ class _QuizScreenState extends State<QuizScreen> {
         submoduleId: widget.submoduleId, // NEU: Übergebe Submodule ID
         durationMinutes: durationMinutes, // NEU: Sende die Zeit
       );
-      
+
       // NEU: Aktualisiere Fortschritte nach dem Beenden der Session
       debugPrint('🔄 Aktualisiere Fortschritte nach Quiz-Session...');
       await provider.updateSubmoduleProgress(widget.submoduleId);
@@ -994,7 +994,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                             fontSize: 14,
                                           ),
                                         ),
-                                        
+
                                       ],
                                     ),
                                     const SizedBox(height: 8),
@@ -1100,7 +1100,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 }
                               }).toList(),
 
-                              // NEU: Feedback NACH OK (nicht automatisch)
+                              // NEU: Feedback nach Antwort
                               if (_answerSubmitted && !_isReviewMode)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 20),

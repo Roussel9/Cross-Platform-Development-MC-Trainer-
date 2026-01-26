@@ -6,6 +6,7 @@ import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
 import 'package:mc_trainer_kami/provider/home_backend_provider.dart';
+import 'package:mc_trainer_kami/provider/home_provider.dart';
 import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
 import '../../../main.dart';
 import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
@@ -29,11 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // Home-Daten laden
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BackendProvider>().fetchHomeData();
+      context.read<HomeProvider>();
     });
 
     final backend = context.read<BackendProvider>();
+
     _achievements = backend.myAchievements;
-    print('test 4:' + backend.myAchievements.length.toString());
   }
 
   void _onItemTapped(int index) {
@@ -149,7 +151,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeaderContent(BuildContext context, BackendProvider backend) {
+  Widget _buildHeaderContent(
+    BuildContext context,
+    BackendProvider backend,
+    HomeProvider home,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
@@ -186,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 20),
           _buildStatCard(
             icon: Icons.my_location_outlined,
-            value: backend.questionsThisWeek.toString(),
+            value: home.questionsThisWeek.toString(),
             label: 'Questions this week',
           ),
           _buildStatCard(
@@ -196,8 +202,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           _buildStatCard(
             icon: Icons.workspace_premium_outlined,
-            value: '${backend.lastModules.length}/${backend.modulesCompleted}',
-            label: 'Modules completed',
+            value: '${home.submodulesCompleted} / ${home.submodulesTotal}',
+            label: 'Lessons completed',
+          ),
+          _buildStatCard(
+            icon: Icons.directions_walk,
+            value: home.currentStreak.toString(),
+            label: 'Current Streak',
           ),
         ],
       ),
@@ -469,169 +480,176 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<BackendProvider>(
       builder: (context, backend, child) {
-        if (backend.isLoading) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+        return Consumer<HomeProvider>(
+          builder: (context, home, child) {
+            if (backend.isLoading) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
 
-        if (backend.error != null) {
-          return Scaffold(body: Center(child: Text(backend.error!)));
-        }
+            if (backend.error != null) {
+              return Scaffold(body: Center(child: Text(backend.error!)));
+            }
 
-        return Stack(
-          children: [
-            // 1. Hintergrundbild
-            Positioned.fill(
-              child: Image.asset(
-                'assets/images/background.jpg',
-                fit: BoxFit.cover,
-              ),
-            ),
-            // 2. Transparenter Gradient
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: AppColors.darkOverlayGradient,
+            return Stack(
+              children: [
+                // 1. Hintergrundbild
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/background.jpg',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
-            ),
-            // 3. Scaffold mit Inhalt
-            Scaffold(
-              backgroundColor: Colors.transparent,
-              extendBodyBehindAppBar: true,
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                title: Row(
-                  children: [
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.appHeaderBackgroundGradient,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.school,
-                        size: 20,
-                        color: Colors.white,
-                      ),
+                // 2. Transparenter Gradient
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: AppColors.darkOverlayGradient,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      AppStrings.appTitle,
-                      style: TextStyle(
-                        color: Colors.blue.shade500,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                actions: [
-                  Stack(
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.notifications_none,
-                          color: Colors.black,
-                        ),
-                        onPressed: () {},
-                      ),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
+                // 3. Scaffold mit Inhalt
+                Scaffold(
+                  backgroundColor: Colors.transparent,
+                  extendBodyBehindAppBar: true,
+                  appBar: AppBar(
+                    backgroundColor: Colors.white,
+                    elevation: 0,
+                    title: Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
                           decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(6),
+                            gradient: AppColors.appHeaderBackgroundGradient,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          constraints: const BoxConstraints(
-                            minWidth: 12,
-                            minHeight: 12,
+                          child: const Icon(
+                            Icons.school,
+                            size: 20,
+                            color: Colors.white,
                           ),
-                          child: const Text(
-                            '3',
-                            style: TextStyle(color: Colors.white, fontSize: 8),
-                            textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          AppStrings.appTitle,
+                          style: TextStyle(
+                            color: Colors.blue.shade500,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.notifications_none,
+                              color: Colors.black,
+                            ),
+                            onPressed: () {},
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 12,
+                                minHeight: 12,
+                              ),
+                              child: const Text(
+                                '3',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: GestureDetector(
+                          onTap: () {
+                            // Zur Profilseite navigieren
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ProfileScreen(),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            backgroundColor: Colors.grey,
+                            radius: 15,
+                            child: Text(
+                              backend.userInitials,
+                              style: const TextStyle(
+                                color: AppColors.primaryColorDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: GestureDetector(
-                      onTap: () {
-                        // Zur Profilseite navigieren
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ProfileScreen(),
-                          ),
-                        );
-                      },
-                      child: CircleAvatar(
-                        backgroundColor: Colors.grey,
-                        radius: 15,
-                        child: Text(
-                          backend.userInitials,
-                          style: const TextStyle(
-                            color: AppColors.primaryColorDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                  body: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // Abstand für die transparente AppBar
+                        SizedBox(
+                          height:
+                              AppBar().preferredSize.height +
+                              MediaQuery.of(context).padding.top,
                         ),
+                        const SizedBox(height: 20),
+                        // Header Statistiken
+                        // Main Content
+                        // Header Content mit Provider-Daten
+                        _buildHeaderContent(context, backend, home),
+                        // Main Content mit Provider-Daten
+                        _buildMainContent(context, backend),
+                      ],
+                    ),
+                  ),
+                  bottomNavigationBar: BottomNavigationBar(
+                    items: const <BottomNavigationBarItem>[
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.home),
+                        label: 'Home',
                       ),
-                    ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.library_books),
+                        label: 'Modules',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.person),
+                        label: 'Profile',
+                      ),
+                    ],
+                    currentIndex: _selectedIndex,
+                    selectedItemColor: Theme.of(context).colorScheme.primary,
+                    unselectedItemColor: Colors.grey.shade600,
+                    onTap: _onItemTapped,
+                    backgroundColor: Colors.white,
+                    elevation: 10,
                   ),
-                ],
-              ),
-              body: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Abstand für die transparente AppBar
-                    SizedBox(
-                      height:
-                          AppBar().preferredSize.height +
-                          MediaQuery.of(context).padding.top,
-                    ),
-                    const SizedBox(height: 20),
-                    // Header Statistiken
-                    // Main Content
-                    // Header Content mit Provider-Daten
-                    _buildHeaderContent(context, backend),
-                    // Main Content mit Provider-Daten
-                    _buildMainContent(context, backend),
-                  ],
                 ),
-              ),
-              bottomNavigationBar: BottomNavigationBar(
-                items: const <BottomNavigationBarItem>[
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.home),
-                    label: 'Home',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.library_books),
-                    label: 'Modules',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.person),
-                    label: 'Profile',
-                  ),
-                ],
-                currentIndex: _selectedIndex,
-                selectedItemColor: Theme.of(context).colorScheme.primary,
-                unselectedItemColor: Colors.grey.shade600,
-                onTap: _onItemTapped,
-                backgroundColor: Colors.white,
-                elevation: 10,
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );

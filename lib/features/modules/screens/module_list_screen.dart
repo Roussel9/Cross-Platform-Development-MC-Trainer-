@@ -670,10 +670,12 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                   Consumer<BackendProvider>(
                     builder: (context, provider, _) {
                       if (provider.isLoading) {
-                        return const Center(child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: CircularProgressIndicator(),
-                        ));
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
                       }
 
                       if (provider.error != null) {
@@ -684,7 +686,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                       }
 
                       debugPrint('ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}');
-                      
+
                       // Laden der Fortschritte aus Supabase
                       return FutureBuilder<Map<int, Map<String, dynamic>>>(
                         future: provider.loadUserProgressForModules(provider.lastModules),
