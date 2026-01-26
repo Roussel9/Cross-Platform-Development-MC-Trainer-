@@ -158,7 +158,7 @@ class BackendProvider with ChangeNotifier {
     fetchHomeData();
     fetchNotifications();
 
-    // Beobachte Auth-Status; beim Login/Logout ggf. Module nachladen
+    // Beobachte Auth-Status; beim Login/Logout  Module nachladen
     try {
       _authSub = _supabase.auth.onAuthStateChange.listen((data) {
         debugPrint('Auth state changed: $data');
@@ -167,7 +167,7 @@ class BackendProvider with ChangeNotifier {
         fetchNotifications();
       });
     } catch (e) {
-      // manche Supabase-Versionen haben andere Signaturen; nur debug
+     
       debugPrint('Auth listener nicht registriert: $e');
     }
   }
@@ -209,7 +209,7 @@ class BackendProvider with ChangeNotifier {
               fileOptions: const FileOptions(upsert: true),
             );
       } else {
-        // MOBILE: fileInput MUSS File sein
+        // MOBILE
         await _supabase.storage
             .from('avatar_profile')
             .upload(
@@ -386,15 +386,13 @@ class BackendProvider with ChangeNotifier {
         lastSession = sessions.first as Map<String, dynamic>;
       }
 
-      // NOTE: Don't load modules here to avoid overwriting the full module list.
-      // Modules are loaded via `fetchModules()` to ensure the full set is available.
 
       // --- Statistiken setzen ---
       questionsThisWeek = lastSession?['total_questions'] ?? 0;
       // Module aus user_statistics berechnen
       //modulesCompleted = 5; // TODO: aus Datenbank berechnen
       currentStreak = 7; // TODO: aus Datenbank berechnen
-      // Dummy-Daten (müssen später durch echte Abfragen ersetzt werden)
+      // Dummy-Daten 
       currentStreak = 7;
     } catch (e) {
       error = 'Daten konnten nicht geladen werden.$e';
@@ -466,8 +464,8 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // NEU: Profil Daten abrufen
-  // NEU: Profil Daten abrufen
+  //  Profil Daten abrufen
+  //  Profil Daten abrufen
   Future<void> fetchProfileData() async {
     isLoading = true;
     notifyListeners();
@@ -476,7 +474,7 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      print('🔍 Lade Profildaten für User: ${user.id}');
+      print(' Lade Profildaten für User: ${user.id}');
 
       // 1. Benutzerdaten aus user_profiles Tabelle
       final profileResponse = await _supabase
@@ -489,7 +487,7 @@ class BackendProvider with ChangeNotifier {
             return null;
           });
 
-      print('📊 Profil Response: $profileResponse');
+      print('Profil Response: $profileResponse');
 
       if (profileResponse != null) {
         profileName = profileResponse['name'] as String? ?? '';
@@ -513,7 +511,7 @@ class BackendProvider with ChangeNotifier {
         print('   - Username: $profileUsername');
         print('   - Mitglied seit: $profileCreatedAt');
 
-        // Falls name leer ist, verwende den aus user_metadata
+        
         if (profileName.isEmpty) {
           final fullName = user.userMetadata?['full_name'];
           profileName = (fullName != null && fullName.isNotEmpty)
@@ -521,7 +519,7 @@ class BackendProvider with ChangeNotifier {
               : user.email?.split('@').first.capitalize() ?? 'User';
         }
       } else {
-        print('⚠️ Kein Profil gefunden, setze Standardwerte');
+        print(' Kein Profil gefunden, setze Standardwerte');
         // Fallback auf User Metadata
         final fullName = user.userMetadata?['full_name'];
         profileName = (fullName != null && fullName.isNotEmpty)
@@ -595,7 +593,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // NEU: Statistiken für HomeScreen berechnen
+  //  Statistiken für HomeScreen berechnen
   Future<void> _calculateUserStatistics() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -629,10 +627,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // NEU: Profil aktualisieren (VERBESSERTE VERSION MIT DEBUGGING)
-  // NEU: Profil aktualisieren (MIT AUTH-EMAIL UPDATE)
-  // NEU: Profil aktualisieren (OHNE VERIFIZIERUNG - MIT SOFORTIGER EMAIL-ÄNDERUNG)
-  // NEU: Profil aktualisieren (DIREKT OHNE VERIFIZIERUNG)
+   //  Profil aktualisieren 
   Future<bool> updateProfile({
     required String name,
     required String email,
@@ -649,7 +644,7 @@ class BackendProvider with ChangeNotifier {
 
       print('✅ User gefunden: ${user.id}, ${user.email}');
 
-      // ✅ WICHTIG: Prüfe ob Email geändert wurde
+      //  Prüfe ob Email geändert wurde
       final originalAuthEmail = user.email ?? '';
       bool emailChanged = email != originalAuthEmail;
 
@@ -699,11 +694,11 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // 2. WICHTIG: Auth-Email DIREKT aktualisieren (ohne Verifizierung)
+      // 2.  Auth-Email DIREKT aktualisieren (ohne Verifizierung)
       if (emailChanged) {
         print('🔄 Aktualisiere Auth-Email von $originalAuthEmail zu $email');
         try {
-          // Direkte Email-Änderung (funktioniert weil "Confirm email change" OFF ist)
+          
           await _supabase.auth.updateUser(UserAttributes(email: email));
           print('✅ Auth-Email SOFORT geändert auf: $email');
 
@@ -756,7 +751,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Module separat laden (z.B. für Modules Screen)
+  // Module separat laden 
   Future<void> fetchModules() async {
     isLoading = true;
     notifyListeners();
@@ -827,7 +822,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // --- NEU: Fortschritte aus Supabase laden und Module/Submodule aktualisieren ---
+  // --- Fortschritte aus Supabase laden und Module/Submodule aktualisieren ---
 
   /// Berechnet den Fortschritt eines Moduls basierend auf seinen Submodulen
   /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
@@ -965,46 +960,6 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
   }
 }
 
-
-  /// Berechnet den Fortschritt eines Submoduls basierend auf den Karten (Level)
-  /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
-  /*Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return 0.0;
-
-      // 1. Lade alle Cards/Questions für dieses Submodule
-      final cardsResponse = await _supabase
-          .from('questions')
-          .select('id')
-          .eq('submodule_id', submoduleId) as List<dynamic>;
-
-      if (cardsResponse.isEmpty) return 0.0;
-
-      final cardIds = cardsResponse.map((c) => c['id']).toList();
-      debugPrint('📊 Submodule $submoduleId: ${cardIds.length} total cards');
-
-      // 2. Prüfe wie viele davon der Nutzer gemeistert hat
-      final userProgressResponse = await _supabase
-          .from('user_card_progress')
-          .select('card_id, is_mastered')
-          .eq('user_id', user.id) as List<dynamic>;
-
-      final masteredCount = userProgressResponse
-          .where((p) => (p['is_mastered'] == true) && cardIds.contains(p['card_id']))
-          .length;
-
-      final progress = masteredCount / cardIds.length;
-      debugPrint(
-        '📊 Submodule $submoduleId: $masteredCount/${cardIds.length} mastered = ${(progress * 100).toStringAsFixed(1)}%',
-      );
-
-      return progress;
-    } catch (e) {
-      debugPrint('❌ Error calculating submodule progress: $e');
-      return 0.0;
-    }
-  }*/
 
   /// Berechnet den Fortschritt eines Levels basierend auf gemeisterten Karten
   /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
@@ -1310,7 +1265,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
         }
       }
 
-      // Prüfe beste Session-Accuracy (>= 80% => completed)
+      // Prüfe beste Session-Accuracy 
       final bestSession = await _supabase
           .from('learning_sessions')
           .select('accuracy_percentage')
@@ -1334,7 +1289,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
           .select('id')
           .eq('submodule_id', submoduleId) as List<dynamic>;
 
-      if (cards.isEmpty) return true; // Kein Content = completed
+      if (cards.isEmpty) return true; 
 
       final cardIds = cards.map((c) => c['id']).toList();
 
@@ -1360,7 +1315,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     }
   }
 
-  // NEU: Markiere Submodule als completed in der Datenbank
+  // Markiere Submodule als completed in der Datenbank
   Future<void> markSubmoduleAsCompleted(dynamic submoduleId) async {
     try {
       debugPrint('📌 Markiere Submodule $submoduleId als completed...');
@@ -1601,8 +1556,8 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     String sessionId, {
     required int total,
     required int correct,
-    required dynamic submoduleId, // NEU: Submodule ID um am Ende zu markieren
-    int durationMinutes = 0, // NEU: Dauer in Minuten
+    required dynamic submoduleId, //  Submodule ID um am Ende zu markieren
+    int durationMinutes = 0, //  Dauer in Minuten
   }) async {
     try {
       final incorrect = total - correct;
@@ -1621,14 +1576,14 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
             'incorrect_answered': incorrect,
             'accuracy_percentage': accuracy,
             'status': 'finished',
-            'timer_duration_minutes': durationMinutes, // NEU: Speichere die Zeit
+            'timer_duration_minutes': durationMinutes, // Speichere die Zeit
             'iscompleted': accuracy == 100,
           })
           .eq('id', sessionId);
 
       debugPrint('✅ Session saved to database with duration: $durationMinutes minutes');
 
-      // NEU: Markiere Submodule als completed wenn 80%+ erreicht
+     
       if (accuracy >= 80) {
         await markSubmoduleAsCompleted(submoduleId);
         debugPrint('🎉 Submodule $submoduleId erfolgreich als completed markiert!');
@@ -1648,7 +1603,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
         debugPrint('⚠️ Nur $accuracy% erreicht - Submodule nicht als completed markiert (benötigt 80%)');
       }
 
-      // NEU: Setze is_completed in user_submodule_level_progress bei 100%
+      //  Setze is_completed in user_submodule_level_progress bei 100%
       if (accuracy == 100) {
         final user = _supabase.auth.currentUser;
         if (user != null) {
@@ -1838,7 +1793,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
         });
       }
 
-      // Wenn freigeschaltet: evtl. nächsten Level-Eintrag sicherstellen
+      //  nächsten Level-Eintrag sicherstellen
       if (unlocked) {
         final nextLevel = level + 1;
         final existingNext =
@@ -1863,7 +1818,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
         }
       }
     } catch (e) {
-      // Nicht fatal: nur melden
+     
       print('Fehler beim Neuberechnen des Level-Fortschritts: $e');
     }
   }
@@ -1891,7 +1846,7 @@ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     }
   }
 
-  // Optional: Clear-Methode für Logout
+  //  Clear-Methode für Logout
   void clearData() {
     reset();
   }
