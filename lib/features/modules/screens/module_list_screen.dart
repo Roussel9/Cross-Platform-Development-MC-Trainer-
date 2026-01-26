@@ -512,10 +512,12 @@ class ModuleListScreen extends StatelessWidget {
                   Consumer<BackendProvider>(
                     builder: (context, provider, _) {
                       if (provider.isLoading) {
-                        return const Center(child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: CircularProgressIndicator(),
-                        ));
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
                       }
 
                       if (provider.error != null) {
@@ -525,7 +527,9 @@ class ModuleListScreen extends StatelessWidget {
                         );
                       }
 
-                      debugPrint('ModuleListScreen: provider.allModules.length = ${provider.allModules.length}');
+                      debugPrint(
+                        'ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}',
+                      );
                       // Konvertiere LernenModule -> lokale Module-View-Model
                       final modules = provider.allModules.map((lm) {
                         return Module(
