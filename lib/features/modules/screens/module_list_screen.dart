@@ -531,7 +531,7 @@ class ModuleListScreen extends StatelessWidget {
                         'ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}',
                       );
                       // Konvertiere LernenModule -> lokale Module-View-Model
-                      final modules = provider.lastModules.map((lm) {
+                      final modules = provider.allModules.map((lm) {
                         return Module(
                           id: lm.id,
                           title: lm.name,

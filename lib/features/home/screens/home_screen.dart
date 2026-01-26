@@ -357,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           // Letzte Module anzeigen
-          ...backend.lastModules.map(
+          ...backend.lastModule.map(
             (module) => QuizCard(
               moduleTitle: module.name,
               moduleDescription: module.description ?? '',
@@ -382,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
           CategoryCard(
             icon: Icons.stacked_bar_chart,
             title: 'Browse Modules',
-            subtitle: '${backend.lastModules.length} modules available',
+            subtitle: '${backend.lastModule.length} modules available',
             iconColor: Theme.of(context).colorScheme.primary,
             onTap: () {
               // Navigiere zum neuen Modul-Listen-Screen
