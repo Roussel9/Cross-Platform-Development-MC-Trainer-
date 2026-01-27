@@ -120,7 +120,7 @@ class BackendProvider with ChangeNotifier {
     if (await res) {
       addNotification(
         'New Gift',
-        'Congratulation: you won a new Price <Week Warrior>; You also upgraded your score',
+        'Congratulation: you won a new Price <Warrior>; You also upgraded your score',
       );
       fetchAchievementsData();
     }
@@ -148,12 +148,12 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addAchievementEarlyBird() async {
+  Future<void> addAchievementTopOfClass() async {
     final res = addAchievement(5);
     if (await res) {
       addNotification(
         'New Gift',
-        'Congratulation: you won a new Price <Early Bird>; You also upgraded your score',
+        'Congratulation: you won a new Price <Top Of Class>; You also upgraded your score',
       );
       fetchAchievementsData();
     }

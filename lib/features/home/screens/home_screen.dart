@@ -33,16 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<BackendProvider>().fetchHomeData();
       context.read<HomeProvider>();
     });
-    final homeBackend = context.read<HomeProvider>();
     final backend = context.read<BackendProvider>();
-    homeBackend.fetchQuestionsCount();
     _achievements = backend.myAchievements;
-    int a = homeBackend.currentStreak;
-    if (homeBackend.currentStreak > 0) {
-      print('Please1: $a');
-      backend.addAchievementFirstVisit();
-    }
-    print('Please2: $a : $_achievements');
   }
 
   void _onItemTapped(int index) {
@@ -499,6 +491,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
             if (backend.error != null) {
               return Scaffold(body: Center(child: Text(backend.error!)));
+            }
+            if (home.currentStreak > 0) {
+              backend.addAchievementFirstVisit();
+            }
+            if (home.questionsThisWeek > 99) {
+              backend.addAchievementModuleMaster();
+            }
+            if (home.submodulesCompleted > 9) {
+              backend.addAchievementWeekWarrior();
+            }
+            if (home.currentStreak > 0) {
+              backend.addAchievementFirstVisit();
+            }
+            if (backend.achievedPoint > 999) {
+              backend.addAchievementTopOfClass();
             }
 
             return Stack(
