@@ -62,8 +62,45 @@ class BackendProvider with ChangeNotifier {
   bool isLoading = false; // Ladezustand
   String? error; // Fehlernachricht
 
+  // Cache fuer Fortschritt und Submodule
+  final Map<int, Map<String, dynamic>> _moduleProgressCache = {};
+  DateTime? _moduleProgressCacheAt;
+  String? _moduleProgressCacheUserId;
+  final Duration _moduleProgressCacheTtl = const Duration(minutes: 10);
+  final Map<int, List<Map<String, dynamic>>> _submodulesCache = {};
+  final Map<int, double> _moduleProgressValueCache = {};
+  final Map<int, DateTime> _moduleProgressValueCacheAt = {};
+  final Map<int, double> _submoduleProgressCache = {};
+  final Map<int, DateTime> _submoduleProgressCacheAt = {};
+  final Map<int, bool> _submoduleCompletedCache = {};
+  final Map<int, DateTime> _submoduleCompletedCacheAt = {};
+  final Duration _progressValueCacheTtl = const Duration(minutes: 10);
+
   int get unreadNotificationsCount =>
       notifications.where((n) => !n.isRead).length;
+
+  void _clearProgressCache() {
+    _moduleProgressCache.clear();
+    _moduleProgressCacheAt = null;
+    _moduleProgressCacheUserId = null;
+    _submodulesCache.clear();
+    _moduleProgressValueCache.clear();
+    _moduleProgressValueCacheAt.clear();
+    _submoduleProgressCache.clear();
+    _submoduleProgressCacheAt.clear();
+    _submoduleCompletedCache.clear();
+    _submoduleCompletedCacheAt.clear();
+  }
+
+  void invalidateProgressCache() {
+    _clearProgressCache();
+    notifyListeners();
+  }
+
+  bool _isCacheFresh(DateTime? cachedAt, Duration ttl) {
+    if (cachedAt == null) return false;
+    return DateTime.now().difference(cachedAt) < ttl;
+  }
 
   // Icons und Farben für Achievements
   List<IconData> achievementsIcon = [
@@ -1001,6 +1038,19 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0.0;
 
+      if (_moduleProgressCacheUserId != user.id) {
+        _clearProgressCache();
+        _moduleProgressCacheUserId = user.id;
+      }
+
+      if (moduleId is int) {
+        final cachedAt = _moduleProgressValueCacheAt[moduleId];
+        if (_moduleProgressValueCache.containsKey(moduleId) &&
+            _isCacheFresh(cachedAt, _progressValueCacheTtl)) {
+          return _moduleProgressValueCache[moduleId]!;
+        }
+      }
+
       // Lade alle Submodule des Moduls
       final submodules = await fetchSubmodules(moduleId);
       if (submodules.isEmpty) return 0.0;
@@ -1022,6 +1072,11 @@ class BackendProvider with ChangeNotifier {
         '📊 Module $moduleId: $completedSubmodules/${submodules.length} submodules completed = ${(progress * 100).toStringAsFixed(1)}%',
       );
 
+      if (moduleId is int) {
+        _moduleProgressValueCache[moduleId] = progress;
+        _moduleProgressValueCacheAt[moduleId] = DateTime.now();
+      }
+
       return progress;
     } catch (e) {
       debugPrint('❌ Error calculating module progress: $e');
@@ -1036,6 +1091,19 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0.0;
 
+      if (_moduleProgressCacheUserId != user.id) {
+        _clearProgressCache();
+        _moduleProgressCacheUserId = user.id;
+      }
+
+      if (submoduleId is int) {
+        final cachedAt = _submoduleProgressCacheAt[submoduleId];
+        if (_submoduleProgressCache.containsKey(submoduleId) &&
+            _isCacheFresh(cachedAt, _progressValueCacheTtl)) {
+          return _submoduleProgressCache[submoduleId]!;
+        }
+      }
+
       // Wenn Submodule bereits als completed markiert ist, zeige 100%
       final submoduleCheck =
           await _supabase
@@ -1047,6 +1115,10 @@ class BackendProvider with ChangeNotifier {
       if (submoduleCheck.isNotEmpty) {
         final isCompleted = submoduleCheck.first['iscompleted'] as bool?;
         if (isCompleted == true) {
+          if (submoduleId is int) {
+            _submoduleProgressCache[submoduleId] = 1.0;
+            _submoduleProgressCacheAt[submoduleId] = DateTime.now();
+          }
           return 1.0;
         }
       }
@@ -1069,6 +1141,10 @@ class BackendProvider with ChangeNotifier {
         debugPrint(
           '📊 Submodule $submoduleId: best accuracy = ${accuracy.toStringAsFixed(1)}%',
         );
+        if (submoduleId is int) {
+          _submoduleProgressCache[submoduleId] = progress;
+          _submoduleProgressCacheAt[submoduleId] = DateTime.now();
+        }
         return progress;
       }
 
@@ -1101,6 +1177,10 @@ class BackendProvider with ChangeNotifier {
           debugPrint(
             '📊 Submodule $submoduleId: $answeredCards/$totalCards answered = ${(progress * 100).toStringAsFixed(1)}%',
           );
+          if (submoduleId is int) {
+            _submoduleProgressCache[submoduleId] = progress;
+            _submoduleProgressCacheAt[submoduleId] = DateTime.now();
+          }
           return progress;
         }
       }
@@ -1136,6 +1216,10 @@ class BackendProvider with ChangeNotifier {
         '📊 Submodule $submoduleId: $answeredCount/${questionIds.length} answered = ${(progress * 100).toStringAsFixed(1)}%',
       );
 
+      if (submoduleId is int) {
+        _submoduleProgressCache[submoduleId] = progress;
+        _submoduleProgressCacheAt[submoduleId] = DateTime.now();
+      }
       return progress;
     } catch (e) {
       debugPrint('❌ Error calculating submodule progress: $e');
@@ -1190,55 +1274,111 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return {};
 
+      if (_moduleProgressCacheUserId != user.id) {
+        _clearProgressCache();
+        _moduleProgressCacheUserId = user.id;
+      }
+
+      final moduleIds = modules.map((m) => m.id).whereType<int>().toList();
+      final cacheFresh = _isCacheFresh(
+        _moduleProgressCacheAt,
+        _moduleProgressCacheTtl,
+      );
+      if (cacheFresh &&
+          _moduleProgressCache.keys.toSet().containsAll(moduleIds)) {
+        return {for (final id in moduleIds) id: _moduleProgressCache[id]!};
+      }
+
       debugPrint('🔄 Lade Fortschritte für ${modules.length} Module...');
 
       final Map<int, Map<String, dynamic>> moduleProgressMap = {};
 
-      for (var module in modules) {
-        final moduleId = module.id;
-
-        // Berechne Fortschritt für dieses Modul
-        final progress = await calculateModuleProgress(moduleId);
-
-        // Lade Submodule und deren Fortschritte
-        final submodules = await fetchSubmodules(moduleId);
-        final Map<int, Map<String, dynamic>> submoduleProgressMap = {};
-
-        for (var submodule in submodules) {
-          final submoduleId = submodule['id'];
-          final submoduleProgress = await calculateSubmoduleProgress(
-            submoduleId,
-          );
-          final isCompleted = await isSubmoduleCompleted(submoduleId);
-
-          // Lade Level-Fortschritte
-          final levelProgressList =
-              await _supabase
-                      .from('user_submodule_level_progress')
-                      .select('*')
-                      .eq('user_id', user.id)
-                      .eq('submodule_id', submoduleId)
-                      .order('level_number', ascending: true)
-                  as List<dynamic>;
-
-          submoduleProgressMap[submoduleId as int] = {
-            'progress': submoduleProgress,
-            'is_completed': isCompleted,
-            'levels': levelProgressList,
-          };
+      final List<LernenModule> missingModules = [];
+      if (cacheFresh) {
+        for (final module in modules) {
+          final moduleId = module.id;
+          if (moduleId is int && _moduleProgressCache.containsKey(moduleId)) {
+            moduleProgressMap[moduleId] = _moduleProgressCache[moduleId]!;
+          } else if (moduleId is int) {
+            missingModules.add(module);
+          }
         }
+      } else {
+        missingModules.addAll(modules.where((m) => m.id is int));
+      }
 
-        moduleProgressMap[moduleId] = {
-          'progress': progress,
-          'submodules': submoduleProgressMap,
-        };
+      if (missingModules.isNotEmpty) {
+        final results = await Future.wait(
+          missingModules.map((module) async {
+            final moduleId = module.id as int;
 
-        debugPrint(
-          '✅ Module $moduleId geladen: ${(progress * 100).toStringAsFixed(1)}% Fortschritt',
+            final submodules = await fetchSubmodules(moduleId);
+            final submoduleEntries = await Future.wait(
+              submodules.map((submodule) async {
+                final submoduleId = submodule['id'];
+                final submoduleProgress =
+                    await calculateSubmoduleProgress(submoduleId);
+                final isCompleted =
+                    await isSubmoduleCompleted(submoduleId);
+
+                final levelProgressList =
+                    await _supabase
+                            .from('user_submodule_level_progress')
+                            .select('*')
+                            .eq('user_id', user.id)
+                            .eq('submodule_id', submoduleId)
+                            .order('level_number', ascending: true)
+                        as List<dynamic>;
+
+                return MapEntry<int, Map<String, dynamic>>(
+                  submoduleId as int,
+                  {
+                    'progress': submoduleProgress,
+                    'is_completed': isCompleted,
+                    'levels': levelProgressList,
+                  },
+                );
+              }).toList(),
+            );
+
+            final submoduleProgressMap =
+                Map<int, Map<String, dynamic>>.fromEntries(submoduleEntries);
+
+            final completedCount = submoduleProgressMap.values
+              .where((entry) => entry['is_completed'] == true)
+              .length;
+            final progress = submodules.isEmpty
+              ? 0.0
+              : (completedCount / submodules.length).clamp(0.0, 1.0);
+
+            _moduleProgressValueCache[moduleId] = progress;
+            _moduleProgressValueCacheAt[moduleId] = DateTime.now();
+
+            debugPrint(
+              '✅ Module $moduleId geladen: ${(progress * 100).toStringAsFixed(1)}% Fortschritt',
+            );
+
+            return MapEntry<int, Map<String, dynamic>>(
+              moduleId,
+              {
+                'progress': progress,
+                'submodules': submoduleProgressMap,
+              },
+            );
+          }).toList(),
         );
+
+        for (final entry in results) {
+          moduleProgressMap[entry.key] = entry.value;
+        }
       }
 
       debugPrint('✅ Alle Fortschritte geladen!');
+      _moduleProgressCache
+        ..clear()
+        ..addAll(moduleProgressMap);
+      _moduleProgressCacheAt = DateTime.now();
+      _moduleProgressCacheUserId = user.id;
       return moduleProgressMap;
     } catch (e) {
       debugPrint('❌ Error loading user progress: $e');
@@ -1398,6 +1538,7 @@ class BackendProvider with ChangeNotifier {
 
     isLoading = false;
     error = null;
+    _clearProgressCache();
 
     notifyListeners();
   }
@@ -1405,14 +1546,23 @@ class BackendProvider with ChangeNotifier {
   // --- Submodule laden ---
   Future<List<Map<String, dynamic>>> fetchSubmodules(dynamic moduleId) async {
     try {
+      final moduleKey = moduleId is int ? moduleId : int.tryParse(moduleId.toString() ?? '');
+      if (moduleKey != null) {
+        final cached = _submodulesCache[moduleKey];
+        if (cached != null) return cached;
+      }
+
       final subs =
           await _supabase
                   .from('submodules')
                   .select('*')
                   .eq('modules_id', moduleId)
               as List<dynamic>;
-
-      return subs.map((e) => e as Map<String, dynamic>).toList();
+      final result = subs.map((e) => e as Map<String, dynamic>).toList();
+      if (moduleKey != null) {
+        _submodulesCache[moduleKey] = result;
+      }
+      return result;
     } catch (e) {
       error = 'Konnte Submodule nicht laden: $e';
       notifyListeners();
@@ -1420,11 +1570,48 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
+  Future<void> deleteModules(List<int> moduleIds) async {
+    if (moduleIds.isEmpty) return;
+    try {
+      for (final id in moduleIds) {
+        await _supabase.from('modules').delete().eq('id', id);
+      }
+      _clearProgressCache();
+      await fetchModules();
+    } catch (e) {
+      debugPrint('deleteModules error: $e');
+    }
+  }
+
+  Future<void> deleteSubmodules(List<int> submoduleIds) async {
+    if (submoduleIds.isEmpty) return;
+    try {
+      for (final id in submoduleIds) {
+        await _supabase.from('submodules').delete().eq('id', id);
+      }
+      _clearProgressCache();
+    } catch (e) {
+      debugPrint('deleteSubmodules error: $e');
+    }
+  }
   // NEU: Prüfe ob ein Submodule abgeschlossen ist (alle Cards gemeistert ODER iscompleted=true)
   Future<bool> isSubmoduleCompleted(dynamic submoduleId) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
+
+      if (_moduleProgressCacheUserId != user.id) {
+        _clearProgressCache();
+        _moduleProgressCacheUserId = user.id;
+      }
+
+      if (submoduleId is int) {
+        final cachedAt = _submoduleCompletedCacheAt[submoduleId];
+        if (_submoduleCompletedCache.containsKey(submoduleId) &&
+            _isCacheFresh(cachedAt, _progressValueCacheTtl)) {
+          return _submoduleCompletedCache[submoduleId]!;
+        }
+      }
 
       // Zuerst prüfe ob `iscompleted` in der Datenbank true ist
       final submoduleCheck =
@@ -1440,6 +1627,10 @@ class BackendProvider with ChangeNotifier {
           debugPrint(
             '✅ Submodule $submoduleId: Bereits als completed markiert',
           );
+          if (submoduleId is int) {
+            _submoduleCompletedCache[submoduleId] = true;
+            _submoduleCompletedCacheAt[submoduleId] = DateTime.now();
+          }
           return true;
         }
       }
@@ -1462,18 +1653,11 @@ class BackendProvider with ChangeNotifier {
           debugPrint(
             '✅ Submodule $submoduleId: best accuracy ${accuracy.toStringAsFixed(1)}%',
           );
-          return true;
-        }
-      }
-
-      Future<void> deleteSubmodules(List<int> submoduleIds) async {
-        if (submoduleIds.isEmpty) return;
-        try {
-          for (final id in submoduleIds) {
-            await _supabase.from('submodules').delete().eq('id', id);
+          if (submoduleId is int) {
+            _submoduleCompletedCache[submoduleId] = true;
+            _submoduleCompletedCacheAt[submoduleId] = DateTime.now();
           }
-        } catch (e) {
-          debugPrint('deleteSubmodules error: $e');
+          return true;
         }
       }
 
@@ -1510,21 +1694,15 @@ class BackendProvider with ChangeNotifier {
       debugPrint(
         '✅ Submodule $submoduleId: $masteredCount/${cardIds.length} mastered = ${completion.toStringAsFixed(1)}%',
       );
-      return completion >= 80.0;
+      final completed = completion >= 80.0;
+      if (submoduleId is int) {
+        _submoduleCompletedCache[submoduleId] = completed;
+        _submoduleCompletedCacheAt[submoduleId] = DateTime.now();
+      }
+      return completed;
     } catch (e) {
       debugPrint('❌ Error checking submodule completion: $e');
       return false;
-    }
-  }
-
-  Future<void> deleteSubmodules(List<int> submoduleIds) async {
-    if (submoduleIds.isEmpty) return;
-    try {
-      for (final id in submoduleIds) {
-        await _supabase.from('submodules').delete().eq('id', id);
-      }
-    } catch (e) {
-      debugPrint('deleteSubmodules error: $e');
     }
   }
 
