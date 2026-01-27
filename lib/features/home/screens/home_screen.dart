@@ -11,6 +11,8 @@ import '../../../main.dart';
 import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
 import 'package:mc_trainer_kami/models/achievement_data.dart';
 
+import 'notification_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -31,9 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<BackendProvider>().fetchHomeData();
       context.read<HomeProvider>();
     });
-
     final backend = context.read<BackendProvider>();
-
     _achievements = backend.myAchievements;
   }
 
@@ -492,6 +492,21 @@ class _HomeScreenState extends State<HomeScreen> {
             if (backend.error != null) {
               return Scaffold(body: Center(child: Text(backend.error!)));
             }
+            if (home.currentStreak > 0) {
+              backend.addAchievementFirstVisit();
+            }
+            if (home.questionsThisWeek > 99) {
+              backend.addAchievementModuleMaster();
+            }
+            if (home.submodulesCompleted > 9) {
+              backend.addAchievementWeekWarrior();
+            }
+            if (home.currentStreak > 0) {
+              backend.addAchievementFirstVisit();
+            }
+            if (backend.achievedPoint > 999) {
+              backend.addAchievementTopOfClass();
+            }
 
             return Stack(
               children: [
@@ -551,7 +566,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               Icons.notifications_none,
                               color: Colors.black,
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const NotificationScreen(),
+                                ),
+                              );
+                            },
                           ),
                           Positioned(
                             right: 8,
@@ -566,9 +589,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 minWidth: 12,
                                 minHeight: 12,
                               ),
-                              child: const Text(
-                                '3',
-                                style: TextStyle(
+                              child: Text(
+                                backend.unreadNotificationsCount.toString(),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 8,
                                 ),
