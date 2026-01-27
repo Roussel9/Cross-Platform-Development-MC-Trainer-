@@ -354,13 +354,21 @@ class BackendProvider with ChangeNotifier {
         final achievementId = e['id'] as int;
         final unlockedDate = achievedMap[achievementId];
 
+        final iconIndex = achievementId - 1;
+        final icon = (iconIndex >= 0 && iconIndex < achievementsIcon.length)
+            ? achievementsIcon[iconIndex]
+            : Icons.emoji_events;
+        final color = (iconIndex >= 0 && iconIndex < achievementsColor.length)
+            ? achievementsColor[iconIndex]
+            : Colors.amber;
+
         myAchievements.add(
           Achievement(
             id: e['id'],
             title: e['title'],
             description: e['description'],
-            icon: achievementsIcon[achievementId - 1],
-            color: achievementsColor[achievementId - 1],
+            icon: icon,
+            color: color,
             isUnlocked: unlockedDate != null,
             unlockedDate: unlockedDate,
             points: e['awarded_points'],
@@ -370,7 +378,6 @@ class BackendProvider with ChangeNotifier {
 
       print('test 1:' + achievements.length.toString());
       print('test 2:' + myAchievements.length.toString());
-      print('\n It is just a second test ' + achieved[0].toString() + '\n');
     } catch (e) {
       error = 'Diese Daten konnten nicht geladen werden.';
       print('Fehler: $e');
