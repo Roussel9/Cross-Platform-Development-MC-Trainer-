@@ -324,7 +324,7 @@ class BackendProvider with ChangeNotifier {
       if (user == null) return;
 
       final res = await _supabase
-          .from('user_notifications')
+          .from('user_profiles')
           .select('achieved_points')
           .eq('id', user.id);
 
