@@ -18,9 +18,14 @@ import 'package:mc_trainer_kami/provider/backend_provider.dart';
 // HILFSFUNKTION FÜR KORREKTEN INDEX
 // =========================================================
 
-int _getCorrectIndex(List<Option> options) {
-  final correctIndex = options.indexWhere((opt) => opt.isCorrect);
-  return correctIndex == -1 ? 0 : correctIndex;
+List<int> _getCorrectIndices(List<Option> options) {
+  final correctIndices = <int>[];
+  for (int i = 0; i < options.length; i++) {
+    if (options[i].isCorrect) {
+      correctIndices.add(i);
+    }
+  }
+  return correctIndices;
 }
 
 // NEU: Format Sekunden zu MM:SS
@@ -532,13 +537,13 @@ class _QuizScreenState extends State<QuizScreen> {
     _scrollController = ScrollController();
 
     _questions = widget.lesson.quizQuestions.map((q) {
-      final correctIndex = _getCorrectIndex(q.options);
+      final correctIndices = _getCorrectIndices(q.options);
       return Question(
         id: q.id, // ✅ WICHTIG: ID mitkopieren!
         questionText: q.questionText,
         options: q.options,
-        selectedOptionIndex: null, // Starten ohne Auswahl
-        correctOptionIndex: correctIndex,
+        selectedOptionIndices: null, // Starten ohne Auswahl
+        correctOptionIndices: correctIndices,
         explanation: q.explanation,
       );
     }).toList();
@@ -584,30 +589,64 @@ class _QuizScreenState extends State<QuizScreen> {
   void _calculateResult() {
     _correctAnswers = 0;
     for (var q in _questions) {
-      if (q.selectedOptionIndex != null &&
-          q.selectedOptionIndex == q.correctOptionIndex) {
+      if (_isAnswerCorrect(q)) {
         _correctAnswers++;
       }
     }
   }
 
+  bool _isAnswerCorrect(Question question) {
+    if (question.selectedOptionIndices == null ||
+        question.selectedOptionIndices!.isEmpty) {
+      return false;
+    }
+
+    // Sortiere beide Listen für vergleich
+    final selectedSorted = question.selectedOptionIndices!..sort();
+    final correctSorted = question.correctOptionIndices..sort();
+
+    // Vergleiche ob alle Auswahlpunkte gleich sind
+    if (selectedSorted.length != correctSorted.length) {
+      return false;
+    }
+
+    for (int i = 0; i < selectedSorted.length; i++) {
+      if (selectedSorted[i] != correctSorted[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   void _selectOption(int optionIndex) {
     if (!_isReviewMode && !_answerSubmitted) {
       setState(() {
-        _questions[_currentQuestionIndex].selectedOptionIndex = optionIndex;
+        final currentQuestion = _questions[_currentQuestionIndex];
+        final currentSelected = currentQuestion.selectedOptionIndices ?? [];
+
+        if (currentSelected.contains(optionIndex)) {
+          // Deselektiere wenn bereits ausgewählt
+          currentSelected.removeWhere((index) => index == optionIndex);
+        } else {
+          // Selektiere wenn nicht ausgewählt
+          currentSelected.add(optionIndex);
+        }
+
+        _questions[_currentQuestionIndex].selectedOptionIndices =
+            currentSelected.isEmpty ? null : currentSelected;
         _answerConfirmed = false; // Zurücksetzen: Nutzer kann noch ändern
       });
     }
   }
 
   void _confirmAnswer() {
+    final currentQuestion = _questions[_currentQuestionIndex];
     if (!_isReviewMode &&
         !_answerSubmitted &&
-        _questions[_currentQuestionIndex].selectedOptionIndex != null) {
-      final selectedIndex =
-          _questions[_currentQuestionIndex].selectedOptionIndex!;
-      final isCorrect =
-          selectedIndex == _questions[_currentQuestionIndex].correctOptionIndex;
+        currentQuestion.selectedOptionIndices != null &&
+        currentQuestion.selectedOptionIndices!.isNotEmpty) {
+      final isCorrect = _isAnswerCorrect(currentQuestion);
       setState(() {
         _answerSubmitted = true; // Zeige Feedback
         _answerConfirmed = true; // Markiere als bestätigt
@@ -615,19 +654,17 @@ class _QuizScreenState extends State<QuizScreen> {
           _correctAnswers++;
         }
       });
-      _recordAnswer(selectedIndex);
+      _recordAnswer();
     }
   }
 
-  Future<void> _recordAnswer(int selectedIndex) async {
+  Future<void> _recordAnswer() async {
     try {
       final provider = Provider.of<BackendProvider>(context, listen: false);
       final question = _questions[_currentQuestionIndex];
-      final isCorrect = selectedIndex == question.correctOptionIndex;
+      final isCorrect = _isAnswerCorrect(question);
 
       // NEU: Speichere Antwort mit Question ID (als String)
-      // Hier müssen wir die Question ID haben - müssen wir zur Question-Klasse hinzufügen
-      // Für jetzt: nur tracking
       await provider.recordAnswer(
         question.id?.toString() ?? 'unknown',
         isCorrect,
@@ -757,13 +794,13 @@ class _QuizScreenState extends State<QuizScreen> {
       _elapsedSeconds = 0; // NEU: Reset Timer
 
       _questions = filteredQuestions.map((q) {
-        final correctIndex = _getCorrectIndex(q.options);
+        final correctIndices = _getCorrectIndices(q.options);
         return Question(
           id: q.id, // ✅ WICHTIG: ID mitkopieren!
           questionText: q.questionText,
           options: q.options,
-          selectedOptionIndex: null,
-          correctOptionIndex: correctIndex,
+          selectedOptionIndices: null,
+          correctOptionIndices: correctIndices,
           explanation: q.explanation,
         );
       }).toList();
@@ -1089,13 +1126,14 @@ class _QuizScreenState extends State<QuizScreen> {
                               ) {
                                 final optionIndex = entry.key;
                                 final option = entry.value;
-                                final isCorrect =
-                                    optionIndex ==
-                                    currentQuestion.correctOptionIndex;
+                                final isCorrect = currentQuestion
+                                    .correctOptionIndices
+                                    .contains(optionIndex);
 
                                 final isSelected =
-                                    currentQuestion.selectedOptionIndex ==
-                                    optionIndex;
+                                    currentQuestion.selectedOptionIndices
+                                        ?.contains(optionIndex) ??
+                                    false;
 
                                 // NEU: Im Quiz-Modus nach Auswahl oder Review-Modus
                                 if (_answerSubmitted || _isReviewMode) {
@@ -1120,20 +1158,12 @@ class _QuizScreenState extends State<QuizScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(15),
                                     decoration: BoxDecoration(
-                                      color:
-                                          (_questions[_currentQuestionIndex]
-                                                  .selectedOptionIndex ==
-                                              _questions[_currentQuestionIndex]
-                                                  .correctOptionIndex)
+                                      color: _isAnswerCorrect(currentQuestion)
                                           ? Colors.green.shade50
                                           : Colors.red.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color:
-                                            (_questions[_currentQuestionIndex]
-                                                    .selectedOptionIndex ==
-                                                _questions[_currentQuestionIndex]
-                                                    .correctOptionIndex)
+                                        color: _isAnswerCorrect(currentQuestion)
                                             ? Colors.green.shade200
                                             : Colors.red.shade200,
                                       ),
@@ -1143,17 +1173,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Icon(
-                                          (_questions[_currentQuestionIndex]
-                                                      .selectedOptionIndex ==
-                                                  _questions[_currentQuestionIndex]
-                                                      .correctOptionIndex)
+                                          _isAnswerCorrect(currentQuestion)
                                               ? Icons.check_circle
                                               : Icons.cancel,
                                           color:
-                                              (_questions[_currentQuestionIndex]
-                                                      .selectedOptionIndex ==
-                                                  _questions[_currentQuestionIndex]
-                                                      .correctOptionIndex)
+                                              _isAnswerCorrect(currentQuestion)
                                               ? Colors.green
                                               : Colors.red,
                                           size: 24,
@@ -1161,20 +1185,16 @@ class _QuizScreenState extends State<QuizScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            (_questions[_currentQuestionIndex]
-                                                        .selectedOptionIndex ==
-                                                    _questions[_currentQuestionIndex]
-                                                        .correctOptionIndex)
+                                            _isAnswerCorrect(currentQuestion)
                                                 ? 'Correct!'
                                                 : 'Incorrect!',
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
                                               color:
-                                                  (_questions[_currentQuestionIndex]
-                                                          .selectedOptionIndex ==
-                                                      _questions[_currentQuestionIndex]
-                                                          .correctOptionIndex)
+                                                  _isAnswerCorrect(
+                                                    currentQuestion,
+                                                  )
                                                   ? Colors.green
                                                   : Colors.red,
                                             ),
@@ -1287,9 +1307,11 @@ class _QuizScreenState extends State<QuizScreen> {
                                 // OK Button (Mitte) - nur wenn Antwort ausgewählt aber noch nicht bestätigt
                                 if (!_isReviewMode &&
                                     !_answerSubmitted &&
-                                    _questions[_currentQuestionIndex]
-                                            .selectedOptionIndex !=
-                                        null)
+                                    currentQuestion.selectedOptionIndices !=
+                                        null &&
+                                    currentQuestion
+                                        .selectedOptionIndices!
+                                        .isNotEmpty)
                                   SizedBox(
                                     width: isSmallScreen ? 70 : 100,
                                     child: ElevatedButton(

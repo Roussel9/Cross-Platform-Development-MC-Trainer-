@@ -11,193 +11,7 @@ import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
 // Import des neuen Lesson Screens für die Navigation
 import 'lesson_list_screen.dart';
 
-// Quiz-Set für die erste Lektion "Atomic Structure"
-final List<Question> atomicStructureQuiz = [
-  Question(
-    questionText: 'What charge does an electron carry?',
-    options: [
-      Option(text: 'Positive', label: 'A'),
-      Option(text: 'Neutral', label: 'B'),
-      Option(text: 'Negative', label: 'C', isCorrect: true),
-      Option(text: 'Dual charge', label: 'D'),
-    ],
-    correctOptionIndex: 2,
-  ),
-
-  Question(
-    questionText: 'Who proposed the nuclear model of the atom?',
-    options: [
-      Option(text: 'Dalton', label: 'A'),
-      Option(text: 'Thomson', label: 'B'),
-      Option(text: 'Rutherford', label: 'C', isCorrect: true),
-      Option(text: 'Bohr', label: 'D'),
-    ],
-    correctOptionIndex: 2,
-  ),
-
-  Question(
-    questionText: 'What experiment led to the discovery of the nucleus?',
-    options: [
-      Option(text: 'Cathode ray experiment', label: 'A'),
-      Option(text: 'Gold foil experiment', label: 'B', isCorrect: true),
-      Option(text: 'Oil drop experiment', label: 'C'),
-      Option(text: 'Mass spectrometry', label: 'D'),
-    ],
-    correctOptionIndex: 1,
-  ),
-
-  Question(
-    questionText: 'What is the nucleus mainly composed of?',
-    options: [
-      Option(text: 'Electrons', label: 'A'),
-      Option(text: 'Protons and neutrons', label: 'B', isCorrect: true),
-      Option(text: 'Quarks', label: 'C'),
-      Option(text: 'Ions', label: 'D'),
-    ],
-    correctOptionIndex: 1,
-  ),
-
-  Question(
-    questionText: 'Why are atoms electrically neutral?',
-    options: [
-      Option(text: 'They have no electrons', label: 'A'),
-      Option(text: 'Protons cancel neutrons', label: 'B'),
-      Option(text: 'Equal protons and electrons', label: 'C', isCorrect: true),
-      Option(text: 'Neutrons have charge', label: 'D'),
-    ],
-    correctOptionIndex: 2,
-  ),
-
-  Question(
-    questionText: 'Which particle was discovered first?',
-    options: [
-      Option(text: 'Electron', label: 'A', isCorrect: true),
-      Option(text: 'Proton', label: 'B'),
-      Option(text: 'Neutron', label: 'C'),
-      Option(text: 'Nucleus', label: 'D'),
-    ],
-    correctOptionIndex: 0,
-  ),
-
-  Question(
-    questionText: 'What is the electron cloud?',
-    options: [
-      Option(text: 'Fixed electron paths', label: 'A'),
-      Option(
-        text: 'Region where electrons are likely found',
-        label: 'B',
-        isCorrect: true,
-      ),
-      Option(text: 'The nucleus', label: 'C'),
-      Option(text: 'Energy source of atom', label: 'D'),
-    ],
-    correctOptionIndex: 1,
-  ),
-
-  Question(
-    questionText: 'Which force holds the nucleus together?',
-    options: [
-      Option(text: 'Electromagnetic force', label: 'A'),
-      Option(text: 'Gravitational force', label: 'B'),
-      Option(text: 'Strong nuclear force', label: 'C', isCorrect: true),
-      Option(text: 'Weak force', label: 'D'),
-    ],
-    correctOptionIndex: 2,
-  ),
-
-  Question(
-    questionText: 'What happens when an atom loses an electron?',
-    options: [
-      Option(text: 'It becomes an anion', label: 'A'),
-      Option(text: 'It becomes a cation', label: 'B', isCorrect: true),
-      Option(text: 'It becomes neutral', label: 'C'),
-      Option(text: 'It becomes an isotope', label: 'D'),
-    ],
-    correctOptionIndex: 1,
-  ),
-
-  Question(
-    questionText: 'Which scientist proposed quantized electron orbits?',
-    options: [
-      Option(text: 'Rutherford', label: 'A'),
-      Option(text: 'Bohr', label: 'B', isCorrect: true),
-      Option(text: 'Einstein', label: 'C'),
-      Option(text: 'Dalton', label: 'D'),
-    ],
-    correctOptionIndex: 1,
-  ),
-];
-
-// --- 2. DUMMY DATEN (Bleiben unverändert) ---
-final List<Module> dummyModules = [
-  Module(
-    title: 'Advanced Mathematics',
-    description: 'Master advanced mathematical concepts and problem-solving',
-    totalLessons: 8,
-    completedLessons: 5,
-    progress: 0.65,
-    iconColor: const Color(0xFF5E35B1),
-    icon: Icons.book,
-  ),
-  Module(
-    title: 'Physics Fundamentals',
-    description: 'Explore the fundamental principles of physics',
-    totalLessons: 6,
-    completedLessons: 2,
-    progress: 0.40,
-    iconColor: const Color(0xFF9C27B0),
-    icon: Icons.menu_book,
-  ),
-  Module(
-    title: 'Chemistry Essentials',
-    description: 'Learn the core concepts of chemistry',
-    totalLessons: 7,
-    completedLessons: 0,
-    progress: 0.0,
-    iconColor: const Color(0xFF4CAF50),
-    icon: Icons.science,
-    lessons: [
-      Lesson(
-        title: 'Atomic Structure',
-        duration: '22 min',
-        questions: 20,
-        isLocked: false,
-        // HIER: Zuweisung der Quiz-Fragen
-        quizQuestions: atomicStructureQuiz,
-      ),
-      Lesson(
-        title: 'Chemical Bonding',
-        duration: '28 min',
-        questions: 25,
-        isLocked: false,
-      ),
-      Lesson(
-        title: 'Chemical Reactions',
-        duration: '32 min',
-        questions: 28,
-        isLocked: true,
-      ),
-      Lesson(
-        title: 'Thermodynamics',
-        duration: '40 min',
-        questions: 35,
-        isLocked: true,
-      ),
-    ],
-  ),
-  Module(
-    title: 'Biology Basics',
-    description: 'Understand the fundamentals of life',
-    totalLessons: 5,
-    completedLessons: 5,
-    progress: 1.0,
-    iconColor: const Color(0xFF4CAF50),
-    icon: Icons.local_florist,
-    isCompleted: true,
-  ),
-];
-
-// --- 3. WIDGETS ---
+// --- WIDGETS ---
 
 // Widget für eine einzelne Lektion (NUR für die Vorschau auf dem ModuleListScreen)
 class LessonTile extends StatelessWidget {
@@ -322,25 +136,28 @@ class _ModuleCardState extends State<ModuleCard> {
   @override
   Widget build(BuildContext context) {
     bool hasLessons = widget.module.lessons.isNotEmpty;
-    bool shouldExpandOnHover = _isHovering && hasLessons && !widget.isSelectionMode;
+    bool shouldExpandOnHover =
+        _isHovering && hasLessons && !widget.isSelectionMode;
 
     return GestureDetector(
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
       child: MouseRegion(
-        onEnter: widget.isSelectionMode ? null : (event) {
-          if (hasLessons) setState(() => _isHovering = true);
-        },
-        onExit: widget.isSelectionMode ? null : (event) {
-          if (hasLessons) setState(() => _isHovering = false);
-        },
+        onEnter: widget.isSelectionMode
+            ? null
+            : (event) {
+                if (hasLessons) setState(() => _isHovering = true);
+              },
+        onExit: widget.isSelectionMode
+            ? null
+            : (event) {
+                if (hasLessons) setState(() => _isHovering = false);
+              },
         child: Container(
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.isSelected
-                ? Colors.blue.shade50
-                : Colors.white,
+            color: widget.isSelected ? Colors.blue.shade50 : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: widget.isSelected
                 ? Border.all(color: Colors.blue, width: 2)
@@ -368,9 +185,7 @@ class _ModuleCardState extends State<ModuleCard> {
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: widget.isSelected
-                              ? Colors.blue
-                              : Colors.white,
+                          color: widget.isSelected ? Colors.blue : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: widget.isSelected
@@ -381,10 +196,10 @@ class _ModuleCardState extends State<ModuleCard> {
                         ),
                         child: widget.isSelected
                             ? const Icon(
-                          Icons.check,
-                          size: 16,
-                          color: Colors.white,
-                        )
+                                Icons.check,
+                                size: 16,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                     ),
@@ -418,7 +233,8 @@ class _ModuleCardState extends State<ModuleCard> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: widget.isSelectionMode && widget.isSelected
+                                color:
+                                    widget.isSelectionMode && widget.isSelected
                                     ? Colors.blue.shade800
                                     : Colors.black87,
                               ),
@@ -517,7 +333,7 @@ class _ModuleCardState extends State<ModuleCard> {
                     const Divider(height: 1),
                     const SizedBox(height: 12),
                     ...widget.module.lessons.map(
-                          (lesson) => LessonTile(lesson: lesson),
+                      (lesson) => LessonTile(lesson: lesson),
                     ),
                   ],
                 ),
@@ -539,7 +355,8 @@ class ModuleListScreen extends StatefulWidget {
 }
 
 class _ModuleListScreenState extends State<ModuleListScreen> {
-  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
+      GlobalKey<RefreshIndicatorState>();
 
   // NEUE VARIABLEN FÜR CAB
   bool _isSelectionMode = false;
@@ -583,9 +400,9 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
   void _selectAllModules() {
     setState(() {
       // Verwende _currentModules statt Parameter
-      _selectedModuleIds = Set.from(_currentModules
-          .map((m) => m.id ?? 0)
-          .where((id) => id > 0));
+      _selectedModuleIds = Set.from(
+        _currentModules.map((m) => m.id ?? 0).where((id) => id > 0),
+      );
     });
   }
 
@@ -597,7 +414,8 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
         .where((m) => m.id != null && _selectedModuleIds.contains(m.id))
         .toList();
 
-    String message = 'Möchtest du die ausgewählten Module wirklich löschen?\n\n';
+    String message =
+        'Möchtest du die ausgewählten Module wirklich löschen?\n\n';
     message += 'Ausgewählt: ${selectedModules.length} Module\n';
     for (var module in selectedModules.take(3)) {
       message += '• ${module.title}\n';
@@ -636,7 +454,9 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
               if (allSuccessful && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('${selectedModules.length} Module wurden gelöscht'),
+                    content: Text(
+                      '${selectedModules.length} Module wurden gelöscht',
+                    ),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -644,9 +464,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                 await backend.fetchModules();
               }
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Löschen'),
           ),
         ],
@@ -697,20 +515,21 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
           appBar: _isSelectionMode
               ? _buildSelectionAppBar() // Keine Parameter mehr nötig
               : CustomAppBar(
-            title: 'Browse Modules',
-            subtitle: 'Explore and learn from our comprehensive module library',
-            showBackButton: true,
-            backgroundColor: Colors.white,
-            actions: [AppBarActions(iconColor: Colors.black)],
-          ),
+                  title: 'Browse Modules',
+                  subtitle:
+                      'Explore and learn from our comprehensive module library',
+                  showBackButton: true,
+                  backgroundColor: Colors.white,
+                  actions: [AppBarActions(iconColor: Colors.black)],
+                ),
           floatingActionButton: !_isSelectionMode
               ? FloatingActionButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/import-modules');
-            },
-            backgroundColor: Colors.blue,
-            child: const Icon(Icons.download, color: Colors.white),
-          )
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/import-modules');
+                  },
+                  backgroundColor: Colors.blue,
+                  child: const Icon(Icons.download, color: Colors.white),
+                )
               : null,
           body: RefreshIndicator(
             key: _refreshIndicatorKey,
@@ -723,10 +542,12 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                 child: Consumer<BackendProvider>(
                   builder: (context, provider, _) {
                     if (provider.isLoading) {
-                      return const Center(child: Padding(
-                        padding: EdgeInsets.all(24.0),
-                        child: CircularProgressIndicator(),
-                      ));
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
                     }
 
                     if (provider.error != null) {
@@ -734,7 +555,11 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
                           children: [
-                            const Icon(Icons.error, size: 48, color: Colors.red),
+                            const Icon(
+                              Icons.error,
+                              size: 48,
+                              color: Colors.red,
+                            ),
                             const SizedBox(height: 16),
                             Text('Fehler: ${provider.error}'),
                             const SizedBox(height: 16),
@@ -766,7 +591,11 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                         padding: const EdgeInsets.all(32.0),
                         child: Column(
                           children: [
-                            const Icon(Icons.library_books, size: 64, color: Colors.grey),
+                            const Icon(
+                              Icons.library_books,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
                             const SizedBox(height: 16),
                             const Text(
                               'Keine Module gefunden',
@@ -811,7 +640,11 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.info, color: Colors.blue, size: 20),
+                                const Icon(
+                                  Icons.info,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -835,7 +668,9 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                             final module = _currentModules[index];
                             return ModuleCard(
                               module: module,
-                              isSelected: module.id != null && _selectedModuleIds.contains(module.id),
+                              isSelected:
+                                  module.id != null &&
+                                  _selectedModuleIds.contains(module.id),
                               isSelectionMode: _isSelectionMode,
                               onLongPress: () {
                                 if (!_isSelectionMode) {
@@ -852,7 +687,8 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => LessonListScreen(module: module),
+                                      builder: (context) =>
+                                          LessonListScreen(module: module),
                                     ),
                                   );
                                 }
