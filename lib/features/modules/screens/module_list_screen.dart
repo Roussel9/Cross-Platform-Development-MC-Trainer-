@@ -1,4 +1,4 @@
-// features/modules/screens/module_list_screen.dart 
+// features/modules/screens/module_list_screen.dart (VOLLSTÄNDIG KORRIGIERT für Hover/Click-Hybrid)
 
 import 'package:flutter/material.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
@@ -9,8 +9,9 @@ import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/widgets/custom_app_appbar.dart';
 import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
 // Import des neuen Lesson Screens für die Navigation
+import 'lesson_list_screen.dart';
 
-// --- 3. WIDGETS ---
+// --- WIDGETS ---
 
 // Widget für eine einzelne Lektion (NUR für die Vorschau auf dem ModuleListScreen)
 class LessonTile extends StatelessWidget {
@@ -135,25 +136,28 @@ class _ModuleCardState extends State<ModuleCard> {
   @override
   Widget build(BuildContext context) {
     bool hasLessons = widget.module.lessons.isNotEmpty;
-    bool shouldExpandOnHover = _isHovering && hasLessons && !widget.isSelectionMode;
+    bool shouldExpandOnHover =
+        _isHovering && hasLessons && !widget.isSelectionMode;
 
     return GestureDetector(
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
       child: MouseRegion(
-        onEnter: widget.isSelectionMode ? null : (event) {
-          if (hasLessons) setState(() => _isHovering = true);
-        },
-        onExit: widget.isSelectionMode ? null : (event) {
-          if (hasLessons) setState(() => _isHovering = false);
-        },
+        onEnter: widget.isSelectionMode
+            ? null
+            : (event) {
+                if (hasLessons) setState(() => _isHovering = true);
+              },
+        onExit: widget.isSelectionMode
+            ? null
+            : (event) {
+                if (hasLessons) setState(() => _isHovering = false);
+              },
         child: Container(
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.isSelected
-                ? Colors.blue.shade50
-                : Colors.white,
+            color: widget.isSelected ? Colors.blue.shade50 : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: widget.isSelected
                 ? Border.all(color: Colors.blue, width: 2)
@@ -181,9 +185,7 @@ class _ModuleCardState extends State<ModuleCard> {
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: widget.isSelected
-                              ? Colors.blue
-                              : Colors.white,
+                          color: widget.isSelected ? Colors.blue : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: widget.isSelected
@@ -194,10 +196,10 @@ class _ModuleCardState extends State<ModuleCard> {
                         ),
                         child: widget.isSelected
                             ? const Icon(
-                          Icons.check,
-                          size: 16,
-                          color: Colors.white,
-                        )
+                                Icons.check,
+                                size: 16,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                     ),
@@ -231,7 +233,8 @@ class _ModuleCardState extends State<ModuleCard> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: widget.isSelectionMode && widget.isSelected
+                                color:
+                                    widget.isSelectionMode && widget.isSelected
                                     ? Colors.blue.shade800
                                     : Colors.black87,
                               ),
@@ -298,6 +301,14 @@ class _ModuleCardState extends State<ModuleCard> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${widget.module.completedLessons}/${widget.module.totalLessons} lessons',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -322,7 +333,7 @@ class _ModuleCardState extends State<ModuleCard> {
                     const Divider(height: 1),
                     const SizedBox(height: 12),
                     ...widget.module.lessons.map(
-                          (lesson) => LessonTile(lesson: lesson),
+                      (lesson) => LessonTile(lesson: lesson),
                     ),
                   ],
                 ),
@@ -346,20 +357,19 @@ class ModuleListScreen extends StatefulWidget {
 class _ModuleListScreenState extends State<ModuleListScreen> {
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
-  String _query = '';
-  Future<Map<int, Map<String, dynamic>>>? _progressFuture;
-  String _progressKey = '';
 
+  // NEUE VARIABLEN FÜR CAB
   bool _isSelectionMode = false;
-  final Set<int> _selectedModuleIds = {};
-  List<Module> _currentModules = [];
+  Set<int> _selectedModuleIds = {};
+  List<Module> _currentModules = []; // SPEICHERE AKTUELLE MODULE
 
   Future<void> _refreshModules() async {
     final backend = context.read<BackendProvider>();
     await backend.fetchModules();
-    _exitSelectionMode();
+    _exitSelectionMode(); // Auswahlmodus beenden
   }
 
+  // NEUE METHODEN FÜR CAB
   void _enterSelectionMode() {
     setState(() {
       _isSelectionMode = true;
@@ -377,6 +387,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
     setState(() {
       if (_selectedModuleIds.contains(moduleId)) {
         _selectedModuleIds.remove(moduleId);
+        // Wenn keine Module mehr ausgewählt sind, CAB verlassen
         if (_selectedModuleIds.isEmpty) {
           _exitSelectionMode();
         }
@@ -388,23 +399,24 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
 
   void _selectAllModules() {
     setState(() {
-      _selectedModuleIds
-        ..clear()
-        ..addAll(
-          _currentModules.map((m) => m.id ?? 0).where((id) => id > 0),
-        );
+      // Verwende _currentModules statt Parameter
+      _selectedModuleIds = Set.from(
+        _currentModules.map((m) => m.id ?? 0).where((id) => id > 0),
+      );
     });
   }
 
   void _showDeleteDialog() async {
     final backend = Provider.of<BackendProvider>(context, listen: false);
+
+    // Finde ausgewählte Module aus _currentModules
     final selectedModules = _currentModules
         .where((m) => m.id != null && _selectedModuleIds.contains(m.id))
         .toList();
 
     String message =
-        'Moechtest du die ausgewaehlten Module wirklich loeschen?\n\n';
-    message += 'Ausgewaehlt: ${selectedModules.length} Module\n';
+        'Möchtest du die ausgewählten Module wirklich löschen?\n\n';
+    message += 'Ausgewählt: ${selectedModules.length} Module\n';
     for (var module in selectedModules.take(3)) {
       message += '• ${module.title}\n';
     }
@@ -415,7 +427,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Module loeschen'),
+        title: const Text('Module löschen'),
         content: Text(message),
         actions: [
           TextButton(
@@ -425,11 +437,14 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
+
               bool allSuccessful = true;
               for (var module in selectedModules) {
                 if (module.id != null) {
-                  final success =
-                      await backend.deleteModule(module.id!, module.title);
+                  final success = await backend.deleteModule(
+                    module.id!,
+                    module.title,
+                  );
                   if (!success) {
                     allSuccessful = false;
                   }
@@ -440,7 +455,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      '${selectedModules.length} Module wurden geloescht',
+                      '${selectedModules.length} Module wurden gelöscht',
                     ),
                     backgroundColor: Colors.green,
                   ),
@@ -449,25 +464,24 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                 await backend.fetchModules();
               }
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-            child: const Text('Loeschen'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Löschen'),
           ),
         ],
       ),
     );
   }
 
+  // NEUE APP BAR FÜR CAB
   AppBar _buildSelectionAppBar() {
     return AppBar(
-      backgroundColor: Colors.blue,
+      backgroundColor: Colors.blue, // Verwende eine feste Farbe
       leading: IconButton(
         icon: const Icon(Icons.close, color: Colors.white),
         onPressed: _exitSelectionMode,
       ),
       title: Text(
-        '${_selectedModuleIds.length} ausgewaehlt',
+        '${_selectedModuleIds.length} ausgewählt',
         style: const TextStyle(color: Colors.white),
       ),
       actions: [
@@ -499,7 +513,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: _isSelectionMode
-              ? _buildSelectionAppBar()
+              ? _buildSelectionAppBar() // Keine Parameter mehr nötig
               : CustomAppBar(
                   title: 'Browse Modules',
                   subtitle:
@@ -525,234 +539,170 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
               child: Container(
                 color: Colors.transparent,
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: Column(
-                  children: [
-                    TextField(
-                      onChanged: (value) {
-                        setState(() {
-                          _query = value.trim();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Module suchen...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _query.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  setState(() {
-                                    _query = '';
-                                  });
-                                },
-                              ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                child: Consumer<BackendProvider>(
+                  builder: (context, provider, _) {
+                    if (provider.isLoading) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: CircularProgressIndicator(),
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Consumer<BackendProvider>(
-                      builder: (context, provider, _) {
-                        if (provider.isLoading) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(24.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
+                      );
+                    }
 
-                        if (provider.error != null) {
-                          return Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
+                    if (provider.error != null) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.error,
+                              size: 48,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(height: 16),
+                            Text('Fehler: ${provider.error}'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _refreshModules,
+                              child: const Text('Erneut versuchen'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Module aus Provider laden und in _currentModules speichern
+                    _currentModules = provider.lastModules.map((lm) {
+                      return Module(
+                        id: lm.id,
+                        title: lm.name,
+                        description: lm.description ?? '',
+                        totalLessons: 0,
+                        completedLessons: 0,
+                        progress: 0.0,
+                        iconColor: Colors.blue,
+                        icon: Icons.book,
+                      );
+                    }).toList();
+
+                    if (_currentModules.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.library_books,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Keine Module gefunden',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Importiere neue Module über das Download-Symbol',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/import-modules');
+                              },
+                              icon: const Icon(Icons.download),
+                              label: const Text('Module importieren'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        if (!_isSelectionMode) // Nur zeigen, wenn nicht im Auswahlmodus
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Row(
                               children: [
                                 const Icon(
-                                  Icons.error,
-                                  size: 48,
-                                  color: Colors.red,
+                                  Icons.info,
+                                  color: Colors.blue,
+                                  size: 20,
                                 ),
-                                const SizedBox(height: 16),
-                                Text('Fehler: ${provider.error}'),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _refreshModules,
-                                  child: const Text('Erneut versuchen'),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _isSelectionMode
+                                        ? 'Wähle Module aus zum Löschen'
+                                        : 'Langer Klick auf ein Modul zum Auswählen',
+                                    style: TextStyle(
+                                      color: Colors.blue[800],
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        }
-
-                        if (provider.lastModules.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Text('Keine Module gefunden.'),
-                          );
-                        }
-
-                        final progressKey =
-                            provider.lastModules.map((m) => m.id).join(',');
-                        if (_progressFuture == null ||
-                            _progressKey != progressKey) {
-                          _progressKey = progressKey;
-                          _progressFuture =
-                              provider.loadUserProgressForModules(
-                            provider.lastModules,
-                          );
-                        }
-
-                        return FutureBuilder<Map<int, Map<String, dynamic>>>(
-                          future: _progressFuture,
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(24.0),
-                                  child: CircularProgressIndicator(),
-                                ),
-                              );
-                            }
-
-                            if (snapshot.hasError) {
-                              debugPrint(
-                                '❌ Error loading progress: ${snapshot.error}',
-                              );
-                              return _buildModuleList(
-                                provider.lastModules,
-                                {},
-                              );
-                            }
-
-                            final progressMap = snapshot.data ?? {};
-                            final filteredModules = _query.isEmpty
-                                ? provider.lastModules
-                                : provider.lastModules.where((m) {
-                                    final name = m.name.toLowerCase();
-                                    final desc =
-                                        (m.description ?? '').toLowerCase();
-                                    final q = _query.toLowerCase();
-                                    return name.contains(q) ||
-                                        desc.contains(q);
-                                  }).toList();
-                            return _buildModuleList(
-                              filteredModules,
-                              progressMap,
+                          ),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _currentModules.length,
+                          itemBuilder: (context, index) {
+                            final module = _currentModules[index];
+                            return ModuleCard(
+                              module: module,
+                              isSelected:
+                                  module.id != null &&
+                                  _selectedModuleIds.contains(module.id),
+                              isSelectionMode: _isSelectionMode,
+                              onLongPress: () {
+                                if (!_isSelectionMode) {
+                                  _enterSelectionMode();
+                                }
+                                if (module.id != null) {
+                                  _toggleSelection(module.id!);
+                                }
+                              },
+                              onTap: () {
+                                if (_isSelectionMode && module.id != null) {
+                                  _toggleSelection(module.id!);
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          LessonListScreen(module: module),
+                                    ),
+                                  );
+                                }
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
-                  ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModuleList(
-    List<LernenModule> lernenModules,
-    Map<int, Map<String, dynamic>> progressMap,
-  ) {
-    _currentModules = lernenModules.map((lm) {
-      final progress = (progressMap[lm.id]?['progress'] as double?) ?? 0.0;
-      return Module(
-        id: lm.id,
-        title: lm.name,
-        description: lm.description ?? '',
-        totalLessons: 0,
-        completedLessons: 0,
-        progress: progress,
-        iconColor: Colors.blue,
-        icon: Icons.book,
-      );
-    }).toList();
-
-    if (_currentModules.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('Keine Module gefunden.'),
-      );
-    }
-
-    return Column(
-      children: [
-        if (!_isSelectionMode)
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue[200]!),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info, color: Colors.blue, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Langer Klick auf ein Modul zum Auswaehlen',
-                    style: TextStyle(
-                      color: Colors.blue[800],
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _currentModules.length,
-          itemBuilder: (context, index) {
-            final module = _currentModules[index];
-            return ModuleCard(
-              module: module,
-              isSelected:
-                  module.id != null && _selectedModuleIds.contains(module.id),
-              isSelectionMode: _isSelectionMode,
-              onLongPress: () {
-                if (!_isSelectionMode) {
-                  _enterSelectionMode();
-                }
-                if (module.id != null) {
-                  _toggleSelection(module.id!);
-                }
-              },
-              onTap: () async {
-                if (_isSelectionMode && module.id != null) {
-                  _toggleSelection(module.id!);
-                } else {
-                  await Navigator.pushNamed(
-                    context,
-                    '/submodules',
-                    arguments: module,
-                  );
-                  if (!mounted) return;
-                  context.read<BackendProvider>().invalidateProgressCache();
-                  setState(() {
-                    _progressFuture = null;
-                    _progressKey = '';
-                  });
-                  await _refreshModules();
-                }
-              },
-            );
-          },
         ),
       ],
     );
