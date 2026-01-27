@@ -52,9 +52,7 @@ class LessonCard extends StatelessWidget {
 
     // InkWell für Tipp-Feedback und Navigation
     return InkWell(
-      onTap: selectionMode
-          ? onSelectToggle
-          : (lesson.isLocked ? null : onOpen),
+      onTap: selectionMode ? onSelectToggle : (lesson.isLocked ? null : onOpen),
       onLongPress: onSelectToggle,
       child: Stack(
         children: [
@@ -82,93 +80,99 @@ class LessonCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-            // 1. STATUS ICON (Links)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: Icon(leadingIcon, size: 24, color: iconColor),
-            ),
+                // 1. STATUS ICON (Links)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: Icon(leadingIcon, size: 24, color: iconColor),
+                ),
 
-            // 2. TITEL & METADATEN
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Titel
-                  Text(
-                    lesson.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDimmed ? Colors.grey.shade500 : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Metadaten: Dauer und Fragen
-                  Row(
+                // 2. TITEL & METADATEN
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 4),
+                      // Titel
                       Text(
-                        lesson.duration,
+                        lesson.title,
                         style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 13,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDimmed
+                              ? Colors.grey.shade500
+                              : Colors.black87,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.quiz_outlined,
-                        size: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${lesson.questions} questions',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // NEU: Fortschritts-Anzeige
-                  if (submoduleProgress > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Row(
+                      const SizedBox(height: 4),
+
+                      // Metadaten: Dauer und Fragen
+                      Row(
                         children: [
-                          Expanded(
-                            child: LinearProgressIndicator(
-                              value: submoduleProgress,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                submoduleProgress >= 1.0 ? Colors.green : Colors.blue,
-                              ),
-                              borderRadius: BorderRadius.circular(3),
-                              minHeight: 4,
+                          Icon(
+                            Icons.access_time,
+                            size: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            lesson.duration,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.quiz_outlined,
+                            size: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            '${(submoduleProgress * 100).toInt()}%',
+                            '${lesson.questions} questions',
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: submoduleProgress >= 1.0 ? Colors.green : Colors.blue,
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                ],
-              ),
-            ),
-            // Pfeil-Icon oder Auswahlstatus
+                      // NEU: Fortschritts-Anzeige
+                      if (submoduleProgress > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: LinearProgressIndicator(
+                                  value: submoduleProgress,
+                                  backgroundColor: Colors.grey.shade200,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    submoduleProgress >= 1.0
+                                        ? Colors.green
+                                        : Colors.blue,
+                                  ),
+                                  borderRadius: BorderRadius.circular(3),
+                                  minHeight: 4,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${(submoduleProgress * 100).toInt()}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: submoduleProgress >= 1.0
+                                      ? Colors.green
+                                      : Colors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Pfeil-Icon oder Auswahlstatus
                 if (selectionMode)
                   Icon(
                     isSelected
@@ -186,18 +190,22 @@ class LessonCard extends StatelessWidget {
               top: 8,
               right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.shade100,
                   borderRadius: BorderRadius.circular(12),
-                ), child: Text(
-                                  'Completed',
-                                  style: TextStyle(
-                                    color: Colors.green.shade600,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                ),
+                child: Text(
+                  'Completed',
+                  style: TextStyle(
+                    color: Colors.green.shade600,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 /*child: const Text(
                   'Abgeschlossen',
                   style: TextStyle(
@@ -213,7 +221,10 @@ class LessonCard extends StatelessWidget {
               top: 8,
               right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade600,
                   borderRadius: BorderRadius.circular(12),
@@ -294,69 +305,83 @@ Widget _buildSubmoduleCard(
             onOpen: questionSnapshot.data == null || effectiveLocked
                 ? null
                 : () async {
-              if (questionSnapshot.data!.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Keine Fragen in diesem Submodul.')),
-                );
-                return;
-              }
+                    if (questionSnapshot.data!.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Keine Fragen in diesem Submodul.'),
+                        ),
+                      );
+                      return;
+                    }
 
-              final questionsData = questionSnapshot.data!;
-              final questionIds = questionsData.map((q) => q['id']).toList();
-              final optionsMap = await provider.fetchOptionsForQuestions(questionIds);
+                    final questionsData = questionSnapshot.data!;
+                    final questionIds = questionsData
+                        .map((q) => q['id'])
+                        .toList();
+                    final optionsMap = await provider.fetchOptionsForQuestions(
+                      questionIds,
+                    );
 
-              final List<Question> quizQuestions = [];
-              for (var q in questionsData) {
-                final qId = q['id'];
-                final opts = optionsMap[qId] ?? [];
+                    final List<Question> quizQuestions = [];
+                    for (var q in questionsData) {
+                      final qId = q['id'];
+                      final opts = optionsMap[qId] ?? [];
 
-                final options = opts.map((o) => Option(
-                      text: o['text']?.toString() ?? '',
-                      label: o['label']?.toString() ?? '',
-                      isCorrect: (o['is_correct'] == true),
-                    )).toList();
+                      final options = opts
+                          .map(
+                            (o) => Option(
+                              text: o['text']?.toString() ?? '',
+                              label: o['label']?.toString() ?? '',
+                              isCorrect: (o['is_correct'] == true),
+                            ),
+                          )
+                          .toList();
 
-                int correctIndex = 0;
-                for (int i = 0; i < options.length; i++) {
-                  if (options[i].isCorrect) {
-                    correctIndex = i;
-                    break;
-                  }
-                }
+                      List<int> correctIndex = [];
+                      for (int i = 0; i < options.length; i++) {
+                        if (options[i].isCorrect) {
+                          correctIndex.add(i);
+                          break;
+                        }
+                      }
 
-                quizQuestions.add(Question(
-                  id: qId,
-                  questionText: q['questionText']?.toString() ??
-                      q['question_text']?.toString() ??
-                      '',
-                  options: options,
-                  correctOptionIndex: correctIndex,
-                  explanation: q['explanation']?.toString(),
-                ));
-              }
+                      quizQuestions.add(
+                        Question(
+                          id: qId,
+                          questionText:
+                              q['questionText']?.toString() ??
+                              q['question_text']?.toString() ??
+                              '',
+                          options: options,
+                          correctOptionIndices: correctIndex,
+                          explanation: q['explanation']?.toString(),
+                        ),
+                      );
+                    }
 
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => QuizScreen(
-                    module: module,
-                    lesson: Lesson(
-                      title: lesson.title,
-                      duration: lesson.duration,
-                      questions: quizQuestions.length,
-                      quizQuestions: quizQuestions,
-                    ),
-                    submoduleId: subId,
-                  ),
-                ),
-              );
-            },
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QuizScreen(
+                          module: module,
+                          lesson: Lesson(
+                            title: lesson.title,
+                            duration: lesson.duration,
+                            questions: quizQuestions.length,
+                            quizQuestions: quizQuestions,
+                          ),
+                          submoduleId: subId,
+                        ),
+                      ),
+                    );
+                  },
           );
         },
       );
     },
   );
 }
+
 class LessonListScreen extends StatefulWidget {
   final Module module;
 
@@ -484,20 +509,26 @@ class _LessonListScreenState extends State<LessonListScreen> {
           body: SingleChildScrollView(
             // Setzt den hellgrauen Hintergrund für den Body-Inhalt
             child: Container(
-              color:Colors.transparent, // Setze den hellgrauen Hintergrund
+              color: Colors.transparent, // Setze den hellgrauen Hintergrund
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Modul-Header (Fortschrittsanzeige) - Behält den weißen Hintergrund
                   FutureBuilder<List<Map<String, dynamic>>>(
-                    future: progressProvider.fetchSubmodules(widget.module.id ?? 0),
+                    future: progressProvider.fetchSubmodules(
+                      widget.module.id ?? 0,
+                    ),
                     builder: (context, submodulesSnapshot) {
                       // Zähle completed Submodule
                       return FutureBuilder<int>(
-                        future: _countCompletedSubmodulesHelper(context, submodulesSnapshot.data ?? []),
+                        future: _countCompletedSubmodulesHelper(
+                          context,
+                          submodulesSnapshot.data ?? [],
+                        ),
                         builder: (context, countSnapshot) {
                           final completedCount = countSnapshot.data ?? 0;
-                          final totalCount = submodulesSnapshot.data?.length ?? 0;
+                          final totalCount =
+                              submodulesSnapshot.data?.length ?? 0;
 
                           return Container(
                             padding: const EdgeInsets.all(20),
@@ -531,15 +562,21 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     SizedBox(
-                                      width: MediaQuery.of(context).size.width - 120,
+                                      width:
+                                          MediaQuery.of(context).size.width -
+                                          120,
                                       child: LinearProgressIndicator(
-                                        value: totalCount > 0 ? completedCount / totalCount : 0,
+                                        value: totalCount > 0
+                                            ? completedCount / totalCount
+                                            : 0,
                                         backgroundColor: Colors.grey.shade200,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          completedCount == totalCount && totalCount > 0
-                                              ? Colors.green
-                                              : moduleColor,
-                                        ),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              completedCount == totalCount &&
+                                                      totalCount > 0
+                                                  ? Colors.green
+                                                  : moduleColor,
+                                            ),
                                         borderRadius: BorderRadius.circular(5),
                                         minHeight: 10,
                                       ),
@@ -595,78 +632,71 @@ class _LessonListScreenState extends State<LessonListScreen> {
                         ),
                         const SizedBox(height: 16),
                         FutureBuilder<List<Map<String, dynamic>>>(
-                          future: progressProvider.fetchSubmodules(widget.module.id ?? 0),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState != ConnectionState.done) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
+                          future: progressProvider.fetchSubmodules(
+                            widget.module.id ?? 0,
+                          ),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState !=
+                                ConnectionState.done) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
 
-                        if (snapshot.hasError) {
-                          return Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text('Fehler beim Laden der Lektionen: ${snapshot.error}'),
-                          );
-                        }
+                            if (snapshot.hasError) {
+                              return Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  'Fehler beim Laden der Lektionen: ${snapshot.error}',
+                                ),
+                              );
+                            }
 
-                        final subs = snapshot.data ?? [];
-                        final filteredSubs = _query.isEmpty
-                            ? subs
-                            : subs.where((s) {
-                                final title = (s['title']?.toString() ?? '').toLowerCase();
-                                final q = _query.toLowerCase();
-                                return title.contains(q);
-                              }).toList();
+                            final subs = snapshot.data ?? [];
+                            final filteredSubs = _query.isEmpty
+                                ? subs
+                                : subs.where((s) {
+                                    final title = (s['title']?.toString() ?? '')
+                                        .toLowerCase();
+                                    final q = _query.toLowerCase();
+                                    return title.contains(q);
+                                  }).toList();
 
-                        for (final s in filteredSubs) {
-                          final id = s['id'];
-                          if (id is int) {
-                            _submoduleTitles[id] = s['title']?.toString() ?? 'Untitled';
-                          }
-                        }
+                            for (final s in filteredSubs) {
+                              final id = s['id'];
+                              if (id is int) {
+                                _submoduleTitles[id] =
+                                    s['title']?.toString() ?? 'Untitled';
+                              }
+                            }
 
-                        if (filteredSubs.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('No lessons (submodules) found.'),
-                          );
-                        }
+                            if (filteredSubs.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Text('No lessons (submodules) found.'),
+                              );
+                            }
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: filteredSubs.asMap().entries.map<Widget>((entry) {
-                            final s = entry.value;
-                            final originalIndex = subs.indexOf(s);
-                            final subId = s['id'];
-                            final provider = progressProvider;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: filteredSubs.asMap().entries.map<Widget>((
+                                entry,
+                              ) {
+                                final s = entry.value;
+                                final originalIndex = subs.indexOf(s);
+                                final subId = s['id'];
+                                final provider = progressProvider;
 
-                            // NEU: Prüfe ob dieses Submodule completet ist
-                            return FutureBuilder<bool>(
-                              future: provider.isSubmoduleCompleted(subId),
-                              builder: (context, completionSnapshot) {
-                                final isCompleted = completionSnapshot.data ?? false;
+                                // NEU: Prüfe ob dieses Submodule completet ist
+                                return FutureBuilder<bool>(
+                                  future: provider.isSubmoduleCompleted(subId),
+                                  builder: (context, completionSnapshot) {
+                                    final isCompleted =
+                                        completionSnapshot.data ?? false;
 
-                                // NEU: Prüfe ob vorheriges Submodule completed ist (für Sequential Unlock)
-                                if (originalIndex <= 0) {
-                                  // Erstes Submodule ist immer freigeschaltet
-                                  return _buildSubmoduleCard(
-                                    context,
-                                    provider,
-                                    s,
-                                    subId,
-                                    widget.module,
-                                    isCompleted,
-                                    isLocked: false,
-                                    selectionMode: _selectionMode,
-                                    isSelected: subId is int && _selectedSubmoduleIds.contains(subId),
-                                    onSelectToggle: () => _toggleSubmoduleSelection(subId is int ? subId : null),
-                                  );
-                                } else {
-                                  // Prüfe ob vorheriges Submodule completed ist
-                                  final previousSubId = subs[originalIndex - 1]['id'];
-                                  return FutureBuilder<bool>(
-                                    future: provider.isSubmoduleCompleted(previousSubId),
-                                    builder: (context, prevSnapshot) {
-                                      final isPrevCompleted = prevSnapshot.data ?? false;
+                                    // NEU: Prüfe ob vorheriges Submodule completed ist (für Sequential Unlock)
+                                    if (originalIndex <= 0) {
+                                      // Erstes Submodule ist immer freigeschaltet
                                       return _buildSubmoduleCard(
                                         context,
                                         provider,
@@ -674,19 +704,58 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                         subId,
                                         widget.module,
                                         isCompleted,
-                                        isLocked: !(isPrevCompleted || isCompleted), // Locked wenn vorheriges nicht fertig
+                                        isLocked: false,
                                         selectionMode: _selectionMode,
-                                        isSelected: subId is int && _selectedSubmoduleIds.contains(subId),
-                                        onSelectToggle: () => _toggleSubmoduleSelection(subId is int ? subId : null),
+                                        isSelected:
+                                            subId is int &&
+                                            _selectedSubmoduleIds.contains(
+                                              subId,
+                                            ),
+                                        onSelectToggle: () =>
+                                            _toggleSubmoduleSelection(
+                                              subId is int ? subId : null,
+                                            ),
                                       );
-                                    },
-                                  );
-                                }
-                              },
+                                    } else {
+                                      // Prüfe ob vorheriges Submodule completed ist
+                                      final previousSubId =
+                                          subs[originalIndex - 1]['id'];
+                                      return FutureBuilder<bool>(
+                                        future: provider.isSubmoduleCompleted(
+                                          previousSubId,
+                                        ),
+                                        builder: (context, prevSnapshot) {
+                                          final isPrevCompleted =
+                                              prevSnapshot.data ?? false;
+                                          return _buildSubmoduleCard(
+                                            context,
+                                            provider,
+                                            s,
+                                            subId,
+                                            widget.module,
+                                            isCompleted,
+                                            isLocked:
+                                                !(isPrevCompleted ||
+                                                    isCompleted), // Locked wenn vorheriges nicht fertig
+                                            selectionMode: _selectionMode,
+                                            isSelected:
+                                                subId is int &&
+                                                _selectedSubmoduleIds.contains(
+                                                  subId,
+                                                ),
+                                            onSelectToggle: () =>
+                                                _toggleSubmoduleSelection(
+                                                  subId is int ? subId : null,
+                                                ),
+                                          );
+                                        },
+                                      );
+                                    }
+                                  },
+                                );
+                              }).toList(),
                             );
-                          }).toList(),
-                        );
-                      },
+                          },
                         ),
                       ],
                     ),

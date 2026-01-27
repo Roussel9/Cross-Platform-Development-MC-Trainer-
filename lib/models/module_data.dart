@@ -13,17 +13,20 @@ class Question {
   final dynamic id; // NEU: für Supabase DB-ID
   final String questionText;
   final List<Option> options;
-  final int correctOptionIndex;
+  // final int correctOptionIndex;
   final String? explanation;
-  int? selectedOptionIndex;
+  // int? selectedOptionIndex;
+  List<int>? selectedOptionIndices; // Starten ohne Auswahl
+  final List<int> correctOptionIndices;
 
   Question({
     this.id,
     required this.questionText,
     required this.options,
-    required this.correctOptionIndex,
+    // required this.correctOptionIndex,
     this.explanation,
-    this.selectedOptionIndex,
+    this.selectedOptionIndices,
+    required this.correctOptionIndices,
   });
 }
 
