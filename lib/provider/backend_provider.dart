@@ -972,7 +972,6 @@ class BackendProvider with ChangeNotifier {
       );
 
       lastModules = combined.values.map((e) {
-
         final m = e as Map<String, dynamic>;
         final idVal = m['id'];
         final idInt = (idVal is int)
@@ -1467,6 +1466,17 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
+      Future<void> deleteSubmodules(List<int> submoduleIds) async {
+        if (submoduleIds.isEmpty) return;
+        try {
+          for (final id in submoduleIds) {
+            await _supabase.from('submodules').delete().eq('id', id);
+          }
+        } catch (e) {
+          debugPrint('deleteSubmodules error: $e');
+        }
+      }
+
       // Lade alle Cards für dieses Submodule
       final cards =
           await _supabase
@@ -1504,6 +1514,17 @@ class BackendProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error checking submodule completion: $e');
       return false;
+    }
+  }
+
+  Future<void> deleteSubmodules(List<int> submoduleIds) async {
+    if (submoduleIds.isEmpty) return;
+    try {
+      for (final id in submoduleIds) {
+        await _supabase.from('submodules').delete().eq('id', id);
+      }
+    } catch (e) {
+      debugPrint('deleteSubmodules error: $e');
     }
   }
 
