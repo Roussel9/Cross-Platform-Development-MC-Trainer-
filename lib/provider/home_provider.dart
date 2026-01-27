@@ -3,11 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
-// Extension zur Großschreibung von Strings
-extension StringCasingExtension on String {
-  String capitalize() => '${this[0].toUpperCase()}${substring(1)}';
-}
-
 // --- Backend Provider ---
 class HomeProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;

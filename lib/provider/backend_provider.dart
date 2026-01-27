@@ -13,23 +13,11 @@ import 'package:flutter/foundation.dart'; // Für kIsWeb
 import 'package:mc_trainer_kami/models/achievement_data.dart';
 import 'dart:async';
 
+import '../models/app_notifications.dart';
+
 // Extension zur Großschreibung von Strings
 extension StringCasingExtension on String {
   String capitalize() => '${this[0].toUpperCase()}${substring(1)}';
-}
-
-class AppNotification {
-  final String title;
-  final String message;
-  final DateTime createdAt;
-  bool isRead;
-
-  AppNotification({
-    required this.title,
-    required this.message,
-    DateTime? createdAt,
-    this.isRead = false,
-  }) : createdAt = createdAt ?? DateTime.now();
 }
 
 // --- Backend Provider ---
@@ -73,6 +61,140 @@ class BackendProvider with ChangeNotifier {
   int get unreadNotificationsCount =>
       notifications.where((n) => !n.isRead).length;
 
+  // Icons und Farben für Achievements
+  List<IconData> achievementsIcon = [
+    Icons.bolt,
+    Icons.calendar_today,
+    Icons.star,
+    Icons.auto_awesome,
+    Icons.wb_sunny,
+  ];
+  List<Color> achievementsColor = [
+    Colors.amber,
+    Colors.blue,
+    Colors.purple,
+    Colors.green,
+    Colors.orange,
+  ];
+  // Konstruktor lädt direkt die Home-Daten
+  BackendProvider() {
+    // Lade initiale Home-Daten (falls möglich)
+    fetchHomeData();
+    fetchPoints();
+    addNotification('Erster Nachricht', 'Willkommen in mc-Trainer');
+    fetchNotifications();
+
+    // Beobachte Auth-Status; beim Login/Logout  Module nachladen
+    try {
+      _authSub = _supabase.auth.onAuthStateChange.listen((data) {
+        debugPrint('Auth state changed: $data');
+        // Nach Auth-Änderung Module neu laden
+        fetchModules();
+        fetchNotifications();
+      });
+    } catch (e) {
+      // manche Supabase-Versionen haben andere Signaturen; nur debug
+      debugPrint('Auth listener nicht registriert: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> addAchievementFirstVisit() async {
+    final res = addAchievement(1);
+    if (await res) {
+      addNotification(
+        'New Gift',
+        'Congratulation: you won a new Price <First Visit>; You also upgraded your score',
+      );
+      fetchAchievementsData();
+    }
+  }
+
+  Future<void> addAchievementWeekWarrior() async {
+    final res = addAchievement(2);
+    if (await res) {
+      addNotification(
+        'New Gift',
+        'Congratulation: you won a new Price <Week Warrior>; You also upgraded your score',
+      );
+      fetchAchievementsData();
+    }
+  }
+
+  Future<void> addAchievementPerfectScore() async {
+    final res = addAchievement(3);
+    if (await res) {
+      addNotification(
+        'New Gift',
+        'Congratulation: you won a new Price <Perfect Score>; You also upgraded your score',
+      );
+      fetchAchievementsData();
+    }
+  }
+
+  Future<void> addAchievementModuleMaster() async {
+    final res = addAchievement(4);
+    if (await res) {
+      addNotification(
+        'New Gift',
+        'Congratulation: you won a new Price <Module Master>; You also upgraded your score',
+      );
+      fetchAchievementsData();
+    }
+  }
+
+  Future<void> addAchievementEarlyBird() async {
+    final res = addAchievement(5);
+    if (await res) {
+      addNotification(
+        'New Gift',
+        'Congratulation: you won a new Price <Early Bird>; You also upgraded your score',
+      );
+      fetchAchievementsData();
+    }
+  }
+
+  Future<bool> addAchievement(int achievementId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
+      final res =
+          await _supabase
+                  .from('user_achievements')
+                  .select('achievement_id')
+                  .eq('user_id', user.id)
+                  .eq('achievement_id', achievementId)
+              as List<dynamic>;
+
+      await _supabase
+          .from('user_profiles')
+          .update({'achieved_points': achievedPoint + (achievementId * 250)})
+          .eq('id', user.id);
+
+      print('Achive--res: $res');
+      if (res.isNotEmpty) {
+        return false;
+      } else {
+        print('TRY: Achive--res: $res');
+        await _supabase.from('user_achievements').insert({
+          'user_id': user.id,
+          //'unlocked_at': DateTime.now().toIso8601String(),
+          'achievement_id': achievementId,
+        });
+      }
+      await fetchNotifications();
+    } catch (e) {
+      debugPrint('addNotification error: $e');
+    }
+    return true;
+  }
+
   Future<void> fetchNotifications() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -81,7 +203,7 @@ class BackendProvider with ChangeNotifier {
       final rows =
           await _supabase
                   .from('user_notifications')
-                  .select('title,message,created_at,is_read')
+                  .select('*')
                   .eq('user_id', user.id)
                   .order('created_at', ascending: false)
               as List<dynamic>;
@@ -89,6 +211,7 @@ class BackendProvider with ChangeNotifier {
       notifications = rows.map((row) {
         final data = row as Map<String, dynamic>;
         return AppNotification(
+          id: data['id'],
           title: data['title']?.toString() ?? '',
           message: data['message']?.toString() ?? '',
           createdAt: DateTime.tryParse(data['created_at']?.toString() ?? ''),
@@ -112,12 +235,29 @@ class BackendProvider with ChangeNotifier {
         'title': title,
         'message': message,
         'is_read': false,
-        'created_at': DateTime.now()
-            .add(const Duration(hours: 1))
-            .toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
       });
 
       await fetchNotifications();
+    } catch (e) {
+      debugPrint('addNotification error: $e');
+    }
+  }
+
+  //setNotificationToRead
+  Future<void> setNotificationToRead(int noteId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      await _supabase
+          .from('user_notifications')
+          .update({'is_read': true})
+          .eq('user_id', user.id)
+          .eq('id', noteId);
+
+      await fetchNotifications();
+      notifyListeners();
     } catch (e) {
       debugPrint('addNotification error: $e');
     }
@@ -142,45 +282,57 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Icons und Farben für Achievements
-  List<IconData> achievementsIcon = [
-    Icons.bolt,
-    Icons.calendar_today,
-    Icons.star,
-    Icons.auto_awesome,
-    Icons.wb_sunny,
-  ];
-  List<Color> achievementsColor = [
-    Colors.amber,
-    Colors.blue,
-    Colors.purple,
-    Colors.green,
-    Colors.orange,
-  ];
-  // Konstruktor lädt direkt die Home-Daten
-  BackendProvider() {
-    // Lade initiale Home-Daten (falls möglich)
-    fetchHomeData();
-    fetchNotifications();
-
-    // Beobachte Auth-Status; beim Login/Logout  Module nachladen
+  Future<void> clearAllNotification() async {
     try {
-      _authSub = _supabase.auth.onAuthStateChange.listen((data) {
-        debugPrint('Auth state changed: $data');
-        // Nach Auth-Änderung Module neu laden
-        fetchModules();
-        fetchNotifications();
-      });
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      await _supabase
+          .from('user_notifications')
+          .delete()
+          .eq('user_id', user.id);
+
+      for (final n in notifications) {
+        n.isRead = true;
+      }
+      notifyListeners();
     } catch (e) {
-      // manche Supabase-Versionen haben andere Signaturen; nur debug
-      debugPrint('Auth listener nicht registriert: $e');
+      debugPrint('delete All Notifification error: $e');
     }
   }
 
-  @override
-  void dispose() {
-    _authSub?.cancel();
-    super.dispose();
+  //deleteNotification
+  Future<void> deleteNotification(int noteId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      await _supabase.from('user_notifications').delete().eq('id', noteId);
+
+      for (final n in notifications) {
+        n.isRead = true;
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('delete All Notifification error: $e');
+    }
+  }
+
+  Future<void> fetchPoints() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final res = await _supabase
+          .from('user_notifications')
+          .select('achieved_points')
+          .eq('id', user.id);
+
+      achievedPoint = res[0]['achieved_points'] as int;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('delete All Notifification error: $e');
+    }
   }
 
   // Berechnung des Fortschritts einer Session
@@ -1654,9 +1806,6 @@ class BackendProvider with ChangeNotifier {
 
       if (accuracy >= 80) {
         await markSubmoduleAsCompleted(submoduleId);
-        debugPrint(
-          '🎉 Submodule $submoduleId erfolgreich als completed markiert!',
-        );
 
         if (!wasCompleted) {
           await addNotification(

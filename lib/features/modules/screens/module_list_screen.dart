@@ -747,6 +747,10 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
       final moduleProgress = (progress?['progress'] as double?) ?? 0.0;
       final isCompleted = moduleProgress >= 1.0;
 
+      if (isCompleted) {
+        final provider = Provider.of<BackendProvider>(context, listen: false);
+        provider.addAchievementModuleMaster();
+      }
       if (lm.id != null) {
         _moduleTitles[lm.id] = lm.name;
       }

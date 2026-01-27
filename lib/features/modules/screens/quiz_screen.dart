@@ -339,6 +339,10 @@ class QuizResultOverlay extends StatelessWidget {
     final successRate = totalQuestions > 0
         ? (correctAnswers / totalQuestions) * 100
         : 0;
+    if (successRate == 100) {
+      final provider = Provider.of<BackendProvider>(context, listen: false);
+      provider.addAchievementPerfectScore();
+    }
     final passed = successRate >= 60;
 
     final screenWidth = MediaQuery.of(context).size.width;
