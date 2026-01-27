@@ -15,6 +15,8 @@ import 'dart:async';
 
 import '../models/app_notifications.dart';
 
+import 'package:mc_trainer_kami/models/importable_module.dart';
+
 // Extension zur Großschreibung von Strings
 extension StringCasingExtension on String {
   String capitalize() => '${this[0].toUpperCase()}${substring(1)}';
@@ -24,6 +26,8 @@ extension StringCasingExtension on String {
 class BackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
   StreamSubscription<dynamic>? _authSub;
+
+  List<ImportableModule> availableModules = [];
 
   String userName = ''; // Vollständiger Name des Benutzers
   String userInitials = ''; // Initialen für Avatar
@@ -84,7 +88,7 @@ class BackendProvider with ChangeNotifier {
     addNotification('Erster Nachricht', 'Willkommen in mc-Trainer');
     fetchNotifications();
 
-    // Beobachte Auth-Status; beim Login/Logout  Module nachladen
+    // Beobachte Auth-Status; beim Login/Logout ggf. Module nachladen
     try {
       _authSub = _supabase.auth.onAuthStateChange.listen((data) {
         debugPrint('Auth state changed: $data');
@@ -618,8 +622,6 @@ class BackendProvider with ChangeNotifier {
           ),
         );
       });
-
-      print('test 2:' + myAchievements.length.toString());
     } catch (e) {
       error = 'Diese Daten konnten nicht geladen werden.';
       print('Fehler: $e');
@@ -1418,29 +1420,6 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deleteModules(List<int> moduleIds) async {
-    if (moduleIds.isEmpty) return;
-    try {
-      for (final id in moduleIds) {
-        await _supabase.from('modules').delete().eq('id', id);
-      }
-      await fetchModules();
-    } catch (e) {
-      debugPrint('deleteModules error: $e');
-    }
-  }
-
-  Future<void> deleteSubmodules(List<int> submoduleIds) async {
-    if (submoduleIds.isEmpty) return;
-    try {
-      for (final id in submoduleIds) {
-        await _supabase.from('submodules').delete().eq('id', id);
-      }
-    } catch (e) {
-      debugPrint('deleteSubmodules error: $e');
-    }
-  }
-
   // NEU: Prüfe ob ein Submodule abgeschlossen ist (alle Cards gemeistert ODER iscompleted=true)
   Future<bool> isSubmoduleCompleted(dynamic submoduleId) async {
     try {
@@ -1487,6 +1466,17 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
+      Future<void> deleteSubmodules(List<int> submoduleIds) async {
+        if (submoduleIds.isEmpty) return;
+        try {
+          for (final id in submoduleIds) {
+            await _supabase.from('submodules').delete().eq('id', id);
+          }
+        } catch (e) {
+          debugPrint('deleteSubmodules error: $e');
+        }
+      }
+
       // Lade alle Cards für dieses Submodule
       final cards =
           await _supabase
@@ -1524,6 +1514,17 @@ class BackendProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error checking submodule completion: $e');
       return false;
+    }
+  }
+
+  Future<void> deleteSubmodules(List<int> submoduleIds) async {
+    if (submoduleIds.isEmpty) return;
+    try {
+      for (final id in submoduleIds) {
+        await _supabase.from('submodules').delete().eq('id', id);
+      }
+    } catch (e) {
+      debugPrint('deleteSubmodules error: $e');
     }
   }
 
@@ -1728,11 +1729,6 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return null;
 
-      debugPrint(
-        '📌 Starte Learning Session für Submodule: $submoduleId (Type: ${submoduleId.runtimeType})',
-      );
-
-      // Erstelle Learning Session OHNE submodule_id (diese kommt in submodules_per_session)
       final insert =
           await _supabase.from('learning_sessions').insert({
                 'user_id': user.id,
@@ -2075,8 +2071,779 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  //  Clear-Methode für Logout
+  // Optional: Clear-Methode für Logout
   void clearData() {
     reset();
+  }
+  // In backend_provider.dart - NEUE IMPORT-METHODEN
+
+  Future<void> fetchImportableModules() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      print('🔍 Lade importierbare Module für User: ${user.id}');
+
+      // 1. Module, die dieser User bereits importiert hat
+      final importedByUser =
+          await _supabase
+                  .from('imported_modules')
+                  .select('module_id')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
+
+      final importedModuleIds = importedByUser
+          .map((im) => im['module_id'] as int)
+          .toList();
+
+      // 2. Default-Module aus der Datenbank (nicht importierbar)
+      final defaultModules =
+          await _supabase.from('modules').select('title').eq('default', true)
+              as List<dynamic>;
+
+      final defaultModuleTitles = defaultModules
+          .map((dm) => dm['title'] as String)
+          .toList();
+
+      print('📊 Default Module: $defaultModuleTitles');
+      print('📊 Bereits importierte Module IDs: $importedModuleIds');
+
+      // 3. Externe Module simulieren
+      final externalModules = await _simulateExternalServerCall();
+
+      // 4. Liste aufbauen
+      availableModules.clear();
+
+      for (var extMod in externalModules) {
+        final extModMap = extMod as Map<String, dynamic>;
+        final String title = extModMap['title'] as String;
+        final int externalId = extModMap['id'] as int;
+
+        // Prüfe ob es ein Default-Modul ist
+        final isDefaultModule = defaultModuleTitles.contains(title);
+
+        if (isDefaultModule) {
+          // Default-Module: Prüfe ob der User es "hat" (in imported_modules)
+          // Finde die module_id in der modules Tabelle
+          final moduleInDb =
+              await _supabase
+                      .from('modules')
+                      .select('id')
+                      .eq('title', title)
+                      .maybeSingle()
+                  as Map<String, dynamic>?;
+
+          bool isImportedByUser = false;
+          if (moduleInDb != null) {
+            final int dbModuleId = moduleInDb['id'] as int;
+            isImportedByUser = importedModuleIds.contains(dbModuleId);
+          }
+
+          availableModules.add(
+            ImportableModule(
+              id: externalId,
+              title: title,
+              description: extModMap['description'] as String,
+              icon: extModMap['icon'] as String,
+              color: extModMap['color'] as String,
+              isDefault: true,
+              isImported: isImportedByUser,
+              serverUrl: extModMap['server_url'] as String?,
+            ),
+          );
+        } else {
+          // Nicht-Default Module: Prüfe ob es bereits in modules existiert
+          final moduleInDb =
+              await _supabase
+                      .from('modules')
+                      .select('id')
+                      .eq('title', title)
+                      .maybeSingle()
+                  as Map<String, dynamic>?;
+
+          bool isImportedByUser = false;
+          if (moduleInDb != null) {
+            final int dbModuleId = moduleInDb['id'] as int;
+            isImportedByUser = importedModuleIds.contains(dbModuleId);
+          }
+
+          availableModules.add(
+            ImportableModule(
+              id: externalId,
+              title: title,
+              description: extModMap['description'] as String,
+              icon: extModMap['icon'] as String,
+              color: extModMap['color'] as String,
+              isDefault: false,
+              isImported: isImportedByUser,
+              serverUrl: extModMap['server_url'] as String?,
+            ),
+          );
+        }
+      }
+
+      print('✅ ${availableModules.length} importierbare Module geladen');
+
+      // Debug-Ausgabe
+      for (var module in availableModules) {
+        print(
+          '   - ${module.title}: Default=${module.isDefault}, Imported=${module.isImported}',
+        );
+      }
+    } catch (e) {
+      error = 'Konnte importierbare Module nicht laden: $e';
+      print('❌ Fehler beim Laden importierbarer Module: $e');
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Korrigierte importModule Methode:
+
+  Future<bool> importModule(ImportableModule module) async {
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        print('❌ Kein User eingeloggt');
+        return false;
+      }
+
+      print('🔄 Starte Import von: ${module.title} für User: ${user.id}');
+
+      // 1. Prüfe ob das Modul bereits existiert
+      print('🔍 Prüfe ob Modul bereits existiert...');
+      final existingModule =
+          await _supabase
+                  .from('modules')
+                  .select('id, default')
+                  .eq('title', module.title)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+
+      late final dynamic moduleId;
+      bool isNewModule = false;
+
+      if (existingModule != null) {
+        print('📦 Modul existiert bereits: ${existingModule['id']}');
+        moduleId = existingModule['id'];
+
+        // Prüfe ob default bereits false ist
+        if ((existingModule['default'] as bool?) == true) {
+          print('🔄 Setze default auf false...');
+          await _supabase
+              .from('modules')
+              .update({'default': false})
+              .eq('id', moduleId);
+        }
+      } else {
+        // 2. Neues Modul erstellen
+        print('📥 Erstelle neues Modul...');
+        final moduleData = {
+          'title': module.title,
+          'description': module.description,
+          'icon': module.icon,
+          'color': module.color,
+          'default': false,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+
+        final result =
+            await _supabase
+                    .from('modules')
+                    .insert(moduleData)
+                    .select('id')
+                    .single()
+                as Map<String, dynamic>;
+
+        moduleId = result['id'];
+        isNewModule = true;
+        print('✅ Neues Modul erstellt mit ID: $moduleId');
+      }
+
+      // 3. In imported_modules protokollieren (JETZT MIT server_url)
+      print('📝 Erstelle imported_modules Eintrag...');
+
+      final importData = {
+        'module_id': moduleId,
+        'user_id': user.id,
+        'imported_at': DateTime.now().toIso8601String(),
+        'download_count': 1,
+        'server_url':
+            module.serverUrl ??
+            'https://trainingserver.example.com', // JETZT FUNKTIONIERT DAS!
+      };
+
+      // DEBUG: Zeige was gesendet wird
+      print('📤 Wird gesendet:');
+      importData.forEach((key, value) {
+        print('   $key: $value (${value.runtimeType})');
+      });
+
+      // Prüfe ob versehentlich ein 'id' Feld existiert
+      if (importData.containsKey('id')) {
+        print(
+          '⚠️ WARNUNG: importData enthält ein "id" Feld! Das wird entfernt...',
+        );
+        importData.remove('id');
+      }
+
+      try {
+        final response = await _supabase
+            .from('imported_modules')
+            .insert(importData)
+            .select()
+            .single();
+
+        print('✅ Import-Eintrag erfolgreich erstellt: $response');
+      } catch (e) {
+        print('❌ FEHLER beim INSERT in imported_modules:');
+        print('   Error: $e');
+        print('   Error Type: ${e.runtimeType}');
+
+        // Teste direkt mit SQL
+        print('🔧 Teste mit SQL Query...');
+        try {
+          final testResult = await _supabase.rpc(
+            'debug_insert',
+            params: {
+              'p_module_id': moduleId,
+              'p_user_id': user.id,
+              'p_server_url':
+                  module.serverUrl ?? 'https://trainingserver.example.com',
+            },
+          );
+          print('SQL Test Result: $testResult');
+        } catch (sqlError) {
+          print('SQL Test auch fehlgeschlagen: $sqlError');
+        }
+
+        rethrow;
+      }
+
+      // await _supabase.from('imported_modules').insert(importData);
+      print(
+        '✅ Import-Eintrag erfolgreich erstellt mit server_url: ${importData['server_url']}',
+      );
+
+      // 4. Beispiel-Submodule nur für neue Module
+      if (isNewModule) {
+        print('📚 Füge Submodule hinzu...');
+        await _addSampleSubmodules(moduleId, module);
+      }
+
+      // 5. Status aktualisieren
+      final index = availableModules.indexWhere((m) => m.title == module.title);
+      if (index != -1) {
+        availableModules[index] = ImportableModule(
+          id: module.id,
+          title: module.title,
+          description: module.description,
+          icon: module.icon,
+          color: module.color,
+          isDefault: false,
+          isImported: true,
+          serverUrl: module.serverUrl,
+        );
+        print(
+          '🔄 UI-Status aktualisiert: ${module.title} ist jetzt importiert',
+        );
+      }
+
+      // 6. Module-Liste neu laden
+      await fetchModules();
+
+      // 7. Optional: Debug-Ausgabe
+      print('🎉 Import erfolgreich abgeschlossen!');
+      return true;
+    } catch (e) {
+      error = 'Import fehlgeschlagen: $e';
+      print('❌ Fehler beim Import: $e');
+
+      // Detaillierte Fehleranalyse
+      if (e.toString().contains('server_url')) {
+        error = 'Datenbankfehler: Problem mit server_url Spalte. ';
+        print(
+          '⚠️ Bitte prüfe ob die server_url Spalte in imported_modules existiert',
+        );
+      }
+
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // --- Simulation externer Server-Abfrage ---
+  // Korrigierte _simulateExternalServerCall Methode:
+  Future<List<Map<String, dynamic>>> _simulateExternalServerCall() async {
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    return [
+      {
+        'id': 101,
+        'title': 'Advanced Mathematics',
+        'description':
+            'Master advanced mathematical concepts and problem-solving',
+        'icon': 'calculate',
+        'color': '#5E35B1',
+        'server_url': 'https://trainingserver.example.com/modules/math',
+      },
+      {
+        'id': 102,
+        'title': 'Physics', // ACHTUNG: Dies IST ein default Modul!
+        'description': 'Explore the fundamental principles of physics',
+        'icon': 'science',
+        'color': '#9C27B0',
+        'server_url': 'https://trainingserver.example.com/modules/physics',
+      },
+      {
+        'id': 103,
+        'title': 'Chemistry',
+        'description': 'Learn the core concepts of chemistry',
+        'icon': 'biotech',
+        'color': '#4CAF50',
+        'server_url': 'https://trainingserver.example.com/modules/chemistry',
+      },
+      {
+        'id': 104,
+        'title': 'Biology', // ACHTUNG: Dies IST ein default Modul!
+        'description': 'Understand the fundamentals of life',
+        'icon': 'psychology',
+        'color': '#2196F3',
+        'server_url': 'https://trainingserver.example.com/modules/biology',
+      },
+      {
+        'id': 105,
+        'title': 'Computer Science',
+        'description': 'Learn programming and algorithms',
+        'icon': 'computer',
+        'color': '#FF5722',
+        'server_url': 'https://trainingserver.example.com/modules/cs',
+      },
+      {
+        'id': 106,
+        'title': 'History',
+        'description': 'Explore world history and civilizations',
+        'icon': 'history_edu',
+        'color': '#795548',
+        'server_url': 'https://trainingserver.example.com/modules/history',
+      },
+      {
+        'id': 107,
+        'title': 'English', // ACHTUNG: Dies IST ein default Modul!
+        'description': 'Learn English language and literature',
+        'icon': 'menu_book',
+        'color': '#F44336',
+        'server_url': 'https://trainingserver.example.com/modules/english',
+      },
+    ];
+  }
+
+  // Methode um zu prüfen, ob ein Modul importierbar ist (nicht default)
+  Future<bool> isModuleImportable(String title) async {
+    try {
+      final result =
+          await _supabase
+                  .from('modules')
+                  .select('default')
+                  .eq('title', title)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+
+      return result == null || (result['default'] as bool?) == false;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  // Methode um User-spezifische importierte Module zu holen
+  Future<List<dynamic>> getUserImportedModules() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final imported =
+          await _supabase
+                  .from('imported_modules')
+                  .select('module_id')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
+
+      return imported;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> _addSampleSubmodules(
+    dynamic moduleId,
+    ImportableModule module,
+  ) async {
+    List<Map<String, dynamic>> submodules = [];
+
+    switch (module.title) {
+      case 'Advanced Mathematics':
+        submodules = [
+          {
+            'modules_id': moduleId,
+            'title': 'Calculus Basics',
+            'description': 'Introduction to differential calculus',
+            'level_count': 3,
+          },
+          {
+            'modules_id': moduleId,
+            'title': 'Linear Algebra',
+            'description': 'Vectors and matrices fundamentals',
+            'level_count': 4,
+          },
+        ];
+        break;
+      case 'Physics Fundamentals':
+        submodules = [
+          {
+            'modules_id': moduleId,
+            'title': 'Mechanics',
+            'description': 'Motion and forces',
+            'level_count': 3,
+          },
+          {
+            'modules_id': moduleId,
+            'title': 'Thermodynamics',
+            'description': 'Heat and energy transfer',
+            'level_count': 2,
+          },
+        ];
+        break;
+      case 'Chemistry Essentials':
+        submodules = [
+          {
+            'modules_id': moduleId,
+            'title': 'Atomic Structure',
+            'description': 'Basics of atomic theory',
+            'level_count': 3,
+          },
+          {
+            'modules_id': moduleId,
+            'title': 'Chemical Reactions',
+            'description': 'Types of chemical reactions',
+            'level_count': 4,
+          },
+        ];
+        break;
+      case 'Biology Basics':
+        submodules = [
+          {
+            'modules_id': moduleId,
+            'title': 'Cell Biology',
+            'description': 'Structure and function of cells',
+            'level_count': 3,
+          },
+          {
+            'modules_id': moduleId,
+            'title': 'Genetics',
+            'description': 'DNA and inheritance',
+            'level_count': 4,
+          },
+        ];
+        break;
+      default:
+        // Generische Submodule für unbekannte Module
+        submodules = [
+          {
+            'modules_id': moduleId,
+            'title': 'Introduction',
+            'description': 'Introduction to ${module.title}',
+            'level_count': 2,
+          },
+          {
+            'modules_id': moduleId,
+            'title': 'Advanced Topics',
+            'description': 'Advanced concepts in ${module.title}',
+            'level_count': 3,
+          },
+        ];
+    }
+
+    for (var submodule in submodules) {
+      try {
+        await _supabase.from('submodules').insert({
+          ...submodule,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        print('⚠️ Fehler beim Hinzufügen von Submodule: $e');
+      }
+    }
+  }
+
+  // In BackendProvider Klasse, nach den anderen Methoden:
+
+  // Prüft ob ein Modul für den User sichtbar ist (in imported_modules vorhanden)
+  // Ersetze diese Methode:
+  Future<bool> isModuleAvailableToUser(int moduleId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
+      // Prüfe ob der User dieses Modul ÜBERHAUPT sehen kann
+      // Das ist der Fall wenn:
+      // 1. Es ein Standard-Modul ist ODER
+      // 2. Es in imported_modules für diesen User existiert
+
+      // Zuerst: Ist es ein Standard-Modul?
+      final module =
+          await _supabase
+                  .from('modules')
+                  .select('default, title')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+
+      if (module == null) return false; // Modul existiert gar nicht
+
+      final bool isDefault = (module['default'] as bool?) == true;
+
+      if (isDefault) {
+        // Standard-Module sind immer verfügbar (können gesehen werden)
+        return true;
+      } else {
+        // Nicht-Standard Module: Prüfe ob importiert
+        final imported =
+            await _supabase
+                    .from('imported_modules')
+                    .select('id')
+                    .eq('module_id', moduleId)
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+                as Map<String, dynamic>?;
+
+        return imported != null;
+      }
+    } catch (e) {
+      print('Fehler beim Prüfen ob Modul verfügbar: $e');
+      return false;
+    }
+  }
+
+  // Prüft ob ein Modul ein Standard-Modul ist
+  Future<bool> isModuleDefault(int moduleId) async {
+    try {
+      final module =
+          await _supabase
+                  .from('modules')
+                  .select('default')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+
+      return module != null && (module['default'] as bool?) == true;
+    } catch (e) {
+      print('Fehler beim Prüfen ob Modul Standard ist: $e');
+      return false;
+    }
+  }
+
+  // Löscht ein Modul (für den aktuellen User)
+  Future<bool> deleteModule(int moduleId, String moduleTitle) async {
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        print('❌ Kein User eingeloggt');
+        return false;
+      }
+
+      print('🗑️ Versuche Modul zu löschen: $moduleTitle (ID: $moduleId)');
+
+      // 1. Hole Modul-Daten um festzustellen ob es Standard ist
+      final moduleData =
+          await _supabase
+                  .from('modules')
+                  .select('default, title')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+
+      if (moduleData == null) {
+        print('❌ Modul nicht gefunden');
+        error = 'Modul nicht gefunden';
+        return false;
+      }
+
+      final bool isDefault = (moduleData['default'] as bool?) == true;
+
+      // 2. In deleted_modules Tabelle protokollieren
+      print('📝 Logge Löschung in deleted_modules...');
+      await _supabase.from('deleted_modules').insert({
+        'module_id': moduleId,
+        'user_id': user.id,
+        'deleted_at': DateTime.now().toIso8601String(),
+      });
+
+      if (isDefault) {
+        // --- STANDARD MODUL ---
+        print('ℹ️ Modul ist ein Standard-Modul');
+
+        // Prüfe ob der User es importiert hat
+        final imported =
+            await _supabase
+                    .from('imported_modules')
+                    .select('id')
+                    .eq('module_id', moduleId)
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+                as Map<String, dynamic>?;
+
+        if (imported != null) {
+          // Aus imported_modules entfernen (wenn vorhanden)
+          print('🗑️ Entferne aus imported_modules...');
+          await _supabase
+              .from('imported_modules')
+              .delete()
+              .eq('module_id', moduleId)
+              .eq('user_id', user.id);
+        } else {
+          // Noch nie importiert: einfach nur in deleted_modules protokollieren
+          print('ℹ️ Modul wurde noch nie importiert, nur protokollieren');
+        }
+
+        print('✅ Standard-Modul für diesen User entfernt');
+      } else {
+        // --- IMPORTIERTES MODUL (nicht Standard) ---
+        print('ℹ️ Modul ist ein importiertes Modul');
+
+        // 3. Aus imported_modules entfernen (für diesen User)
+        print('🗑️ Entferne aus imported_modules...');
+        await _supabase
+            .from('imported_modules')
+            .delete()
+            .eq('module_id', moduleId)
+            .eq('user_id', user.id);
+
+        // 4. Prüfe ob es von anderen Usern verwendet wird
+        print('🔍 Prüfe ob Modul noch von anderen Usern verwendet wird...');
+        final otherUsers =
+            await _supabase
+                    .from('imported_modules')
+                    .select('id')
+                    .eq('module_id', moduleId)
+                    .neq('user_id', user.id)
+                as List<dynamic>;
+
+        if (otherUsers.isEmpty) {
+          print(
+            '🔴 Modul wird von keinem anderen User verwendet - lösche komplett...',
+          );
+
+          // Zuerst abhängige Daten löschen
+          await _deleteDependentData(moduleId);
+
+          // Dann das Modul selbst
+          await _supabase.from('modules').delete().eq('id', moduleId);
+
+          print('✅ Modul komplett aus der Datenbank gelöscht');
+        } else {
+          print(
+            'ℹ️ Modul wird noch von anderen Usern verwendet - nur für diesen User entfernt',
+          );
+        }
+      }
+
+      // 5. Lokale Module-Liste aktualisieren
+      await fetchModules();
+
+      print('✅ Modul erfolgreich entfernt: $moduleTitle');
+      return true;
+    } catch (e) {
+      error = 'Fehler beim Löschen des Moduls: $e';
+      print('❌ Fehler beim Löschen: $e');
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Hilfsmethode zum Löschen abhängiger Daten (nur für nicht-standard Module)
+  Future<void> _deleteDependentData(int moduleId) async {
+    try {
+      print('🗑️ Lösche abhängige Daten für Modul $moduleId...');
+
+      // 1. Alle Submodules dieses Moduls finden
+      final submodules =
+          await _supabase
+                  .from('submodules')
+                  .select('id')
+                  .eq('modules_id', moduleId)
+              as List<dynamic>;
+
+      final submoduleIds = submodules.map((s) => s['id']).toList();
+
+      if (submoduleIds.isNotEmpty) {
+        // 2. Alle Questions für diese Submodules finden
+        final questions =
+            await _supabase
+                    .from('questions')
+                    .select('id')
+                    .inFilter('submodule_id', submoduleIds)
+                as List<dynamic>;
+
+        final questionIds = questions.map((q) => q['id']).toList();
+
+        if (questionIds.isNotEmpty) {
+          // 3. Options für diese Questions löschen
+          await _supabase
+              .from('options')
+              .delete()
+              .inFilter('question_id', questionIds);
+
+          // 4. User card progress für diese Questions löschen
+          await _supabase
+              .from('user_card_progress')
+              .delete()
+              .inFilter('card_id', questionIds);
+
+          // 5. Questions löschen
+          await _supabase
+              .from('questions')
+              .delete()
+              .inFilter('id', questionIds);
+        }
+
+        // 6. User submodule level progress löschen
+        await _supabase
+            .from('user_submodule_level_progress')
+            .delete()
+            .inFilter('submodule_id', submoduleIds);
+
+        // 7. Submodules löschen
+        await _supabase.from('submodules').delete().eq('modules_id', moduleId);
+      }
+
+      // 8. Learning sessions für dieses Modul löschen
+      final submoduleIdsForSessions = submoduleIds.isNotEmpty
+          ? submoduleIds
+          : [0];
+      await _supabase
+          .from('learning_sessions')
+          .delete()
+          .inFilter('submodule_id', submoduleIdsForSessions);
+
+      print('✅ Abhängige Daten gelöscht');
+    } catch (e) {
+      print('⚠️ Fehler beim Löschen abhängiger Daten: $e');
+      // Wir fahren trotzdem fort
+    }
   }
 }

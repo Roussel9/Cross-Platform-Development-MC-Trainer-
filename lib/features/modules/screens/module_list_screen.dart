@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/widgets/custom_app_appbar.dart';
 import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
-import 'package:share_plus/share_plus.dart';
+// Import des neuen Lesson Screens für die Navigation
 import 'lesson_list_screen.dart';
 
 // Quiz-Set für die erste Lektion "Atomic Structure"
@@ -294,21 +294,22 @@ class LessonTile extends StatelessWidget {
   }
 }
 
-// Widget für eine Modul-Karte (mit Aufklappfunktion und Navigation)
+// Ändere die ModuleCard Klasse:
+
 class ModuleCard extends StatefulWidget {
   final Module module;
-  final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
   final bool isSelected;
-  final bool selectionMode;
+  final bool isSelectionMode;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   const ModuleCard({
     super.key,
     required this.module,
-    this.onTap,
-    this.onLongPress,
     this.isSelected = false,
-    this.selectionMode = false,
+    this.isSelectionMode = false,
+    this.onLongPress,
+    this.onTap,
   });
 
   @override
@@ -316,64 +317,79 @@ class ModuleCard extends StatefulWidget {
 }
 
 class _ModuleCardState extends State<ModuleCard> {
-  final bool _isExpanded = false;
   bool _isHovering = false;
-
-  // Funktion zum Navigieren
-  void _navigateToLessons(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LessonListScreen(module: widget.module),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     bool hasLessons = widget.module.lessons.isNotEmpty;
-    // Soll aufklappen, wenn wir hovern (Desktop)
-    bool shouldExpandOnHover = _isHovering && hasLessons;
-    // Soll angezeigt werden, wenn Hover (Desktop) oder wenn bereits getippt (Mobile)
-    bool isExpanded = _isExpanded || shouldExpandOnHover;
+    bool shouldExpandOnHover = _isHovering && hasLessons && !widget.isSelectionMode;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: widget.isSelected ? Colors.blue.withOpacity(0.08) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: widget.isSelected
-            ? Border.all(color: Colors.blue, width: 1.5)
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      child: MouseRegion(
+        onEnter: widget.isSelectionMode ? null : (event) {
+          if (hasLessons) setState(() => _isHovering = true);
+        },
+        onExit: widget.isSelectionMode ? null : (event) {
+          if (hasLessons) setState(() => _isHovering = false);
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? Colors.blue.shade50
+                : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: widget.isSelected
+                ? Border.all(color: Colors.blue, width: 2)
+                : Border.all(color: Colors.transparent),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // --- HEADER des Moduls (immer sichtbar) ---
-          MouseRegion(
-            // 1. HOVER (Desktop): Setze _isHovering auf true/false
-            onEnter: (event) {
-              if (hasLessons) setState(() => _isHovering = true);
-            },
-            onExit: (event) {
-              if (hasLessons) setState(() => _isHovering = false);
-            },
-            child: GestureDetector(
-              // 2. TAP (Mobile/Desktop): Navigiere zur Detailseite
-              onTap: widget.onTap ?? () => _navigateToLessons(context),
-              onLongPress: widget.onLongPress,
-              child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- HEADER des Moduls ---
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon und Progress Bar (Rest der Logik bleibt gleich)
+                  // Auswahl-Checkbox (nur im Auswahlmodus)
+                  if (widget.isSelectionMode)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12, top: 8),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: widget.isSelected
+                              ? Colors.blue
+                              : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: widget.isSelected
+                                ? Colors.blue
+                                : Colors.grey.shade300,
+                            width: 2,
+                          ),
+                        ),
+                        child: widget.isSelected
+                            ? const Icon(
+                          Icons.check,
+                          size: 16,
+                          color: Colors.white,
+                        )
+                            : null,
+                      ),
+                    ),
+
+                  // Icon
                   Container(
                     width: 40,
                     height: 40,
@@ -388,6 +404,8 @@ class _ModuleCardState extends State<ModuleCard> {
                     ),
                   ),
                   const SizedBox(width: 12),
+
+                  // Modul-Informationen
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,10 +415,12 @@ class _ModuleCardState extends State<ModuleCard> {
                           children: [
                             Text(
                               widget.module.title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                                color: widget.isSelectionMode && widget.isSelected
+                                    ? Colors.blue.shade800
+                                    : Colors.black87,
                               ),
                             ),
                             if (widget.module.isCompleted)
@@ -429,10 +449,13 @@ class _ModuleCardState extends State<ModuleCard> {
                           widget.module.description,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade600,
+                            color: widget.isSelectionMode && widget.isSelected
+                                ? Colors.blue.shade700
+                                : Colors.grey.shade600,
                           ),
                         ),
                         const SizedBox(height: 10),
+
                         // Progress Bar
                         Row(
                           children: [
@@ -473,48 +496,41 @@ class _ModuleCardState extends State<ModuleCard> {
                       ],
                     ),
                   ),
-                  // Chevron-Icon oder Auswahlstatus
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0, top: 10),
-                    child: widget.selectionMode
-                        ? Icon(
-                            widget.isSelected
-                                ? Icons.check_circle
-                                : Icons.radio_button_unchecked,
-                            color: widget.isSelected
-                                ? Colors.blue
-                                : Colors.grey,
-                          )
-                        : const Icon(
-                            Icons.keyboard_arrow_right,
-                            color: Colors.grey,
-                          ),
-                  ),
+
+                  // Navigations-Button (nur wenn nicht im Auswahlmodus)
+                  if (!widget.isSelectionMode)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8.0, top: 10),
+                      child: Icon(
+                        Icons.keyboard_arrow_right,
+                        color: Colors.grey,
+                      ),
+                    ),
                 ],
               ),
-            ),
-          ),
 
-          // --- EXPANDABLE BODY (Aufklappbarer Bereich bei Hover) ---
-          if (hasLessons && isExpanded)
-            Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: widget.module.lessons.map((lesson) {
-                  return LessonTile(
-                    lesson: lesson,
-                  ); // Verwenden der lokalen LessonTile
-                }).toList(),
-              ),
-            ),
-        ],
+              // Optional: Lektionen anzeigen bei Hover
+              if (shouldExpandOnHover && hasLessons)
+                Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    ...widget.module.lessons.map(
+                          (lesson) => LessonTile(lesson: lesson),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// --- 4. DER HAUPT-SCREEN ---
+// Ändere die ModuleListScreen Klasse:
+
 class ModuleListScreen extends StatefulWidget {
   const ModuleListScreen({super.key});
 
@@ -523,66 +539,145 @@ class ModuleListScreen extends StatefulWidget {
 }
 
 class _ModuleListScreenState extends State<ModuleListScreen> {
-  String _query = '';
-  final Set<int> _selectedModuleIds = {};
-  final Map<int, String> _moduleTitles = {};
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
 
-  bool get _selectionMode => _selectedModuleIds.isNotEmpty;
+  // NEUE VARIABLEN FÜR CAB
+  bool _isSelectionMode = false;
+  Set<int> _selectedModuleIds = {};
+  List<Module> _currentModules = []; // SPEICHERE AKTUELLE MODULE
 
-  void _toggleModuleSelection(int? id) {
-    if (id == null) return;
+  Future<void> _refreshModules() async {
+    final backend = context.read<BackendProvider>();
+    await backend.fetchModules();
+    _exitSelectionMode(); // Auswahlmodus beenden
+  }
+
+  // NEUE METHODEN FÜR CAB
+  void _enterSelectionMode() {
     setState(() {
-      if (_selectedModuleIds.contains(id)) {
-        _selectedModuleIds.remove(id);
-      } else {
-        _selectedModuleIds.add(id);
-      }
+      _isSelectionMode = true;
     });
   }
 
-  void _clearSelection() {
+  void _exitSelectionMode() {
     setState(() {
+      _isSelectionMode = false;
       _selectedModuleIds.clear();
     });
   }
 
-  Future<void> _deleteSelectedModules(BackendProvider provider) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Module löschen?'),
-          content: Text(
-            'Möchtest du ${_selectedModuleIds.length} Modul(e) wirklich löschen?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Abbrechen'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Löschen'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true) {
-      await provider.deleteModules(_selectedModuleIds.toList());
-      _clearSelection();
-    }
+  void _toggleSelection(int moduleId) {
+    setState(() {
+      if (_selectedModuleIds.contains(moduleId)) {
+        _selectedModuleIds.remove(moduleId);
+        // Wenn keine Module mehr ausgewählt sind, CAB verlassen
+        if (_selectedModuleIds.isEmpty) {
+          _exitSelectionMode();
+        }
+      } else {
+        _selectedModuleIds.add(moduleId);
+      }
+    });
   }
 
-  Future<void> _shareSelectedModules() async {
-    final titles = _selectedModuleIds
-        .map((id) => _moduleTitles[id])
-        .whereType<String>()
+  void _selectAllModules() {
+    setState(() {
+      // Verwende _currentModules statt Parameter
+      _selectedModuleIds = Set.from(_currentModules
+          .map((m) => m.id ?? 0)
+          .where((id) => id > 0));
+    });
+  }
+
+  void _showDeleteDialog() async {
+    final backend = Provider.of<BackendProvider>(context, listen: false);
+
+    // Finde ausgewählte Module aus _currentModules
+    final selectedModules = _currentModules
+        .where((m) => m.id != null && _selectedModuleIds.contains(m.id))
         .toList();
-    if (titles.isEmpty) return;
-    final text = 'Meine Module:\n- ${titles.join('\n- ')}';
-    await Share.share(text);
+
+    String message = 'Möchtest du die ausgewählten Module wirklich löschen?\n\n';
+    message += 'Ausgewählt: ${selectedModules.length} Module\n';
+    for (var module in selectedModules.take(3)) {
+      message += '• ${module.title}\n';
+    }
+    if (selectedModules.length > 3) {
+      message += '• ... und ${selectedModules.length - 3} weitere\n';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Module löschen'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              bool allSuccessful = true;
+              for (var module in selectedModules) {
+                if (module.id != null) {
+                  final success = await backend.deleteModule(
+                    module.id!,
+                    module.title,
+                  );
+                  if (!success) {
+                    allSuccessful = false;
+                  }
+                }
+              }
+
+              if (allSuccessful && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${selectedModules.length} Module wurden gelöscht'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _exitSelectionMode();
+                await backend.fetchModules();
+              }
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // NEUE APP BAR FÜR CAB
+  AppBar _buildSelectionAppBar() {
+    return AppBar(
+      backgroundColor: Colors.blue, // Verwende eine feste Farbe
+      leading: IconButton(
+        icon: const Icon(Icons.close, color: Colors.white),
+        onPressed: _exitSelectionMode,
+      ),
+      title: Text(
+        '${_selectedModuleIds.length} ausgewählt',
+        style: const TextStyle(color: Colors.white),
+      ),
+      actions: [
+        if (_selectedModuleIds.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.white),
+            onPressed: _showDeleteDialog,
+          ),
+        IconButton(
+          icon: const Icon(Icons.select_all, color: Colors.white),
+          onPressed: _selectAllModules,
+        ),
+      ],
+    );
   }
 
   @override
@@ -599,204 +694,181 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
         ),
         Scaffold(
           backgroundColor: Colors.transparent,
-          appBar: _selectionMode
-              ? AppBar(
-                  title: Text('${_selectedModuleIds.length} selected'),
-                  leading: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: _clearSelection,
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _deleteSelectedModules(
-                        Provider.of<BackendProvider>(context, listen: false),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share),
-                      onPressed: _shareSelectedModules,
-                    ),
-                  ],
-                )
+          appBar: _isSelectionMode
+              ? _buildSelectionAppBar() // Keine Parameter mehr nötig
               : CustomAppBar(
-                  title: 'Browse Modules',
-                  subtitle:
-                      'Explore and learn from our comprehensive module library',
-                  showBackButton: true,
-                  backgroundColor: Colors.white,
-                  actions: [AppBarActions(iconColor: Colors.black)],
-                ),
-          body: SingleChildScrollView(
-            child: Container(
-              color: Colors.transparent,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              child: Column(
-                children: [
-                  // Suchleiste
-                  TextField(
-                    onChanged: (value) {
-                      setState(() {
-                        _query = value.trim();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Module suchen...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _query = '';
-                                });
-                              },
+            title: 'Browse Modules',
+            subtitle: 'Explore and learn from our comprehensive module library',
+            showBackButton: true,
+            backgroundColor: Colors.white,
+            actions: [AppBarActions(iconColor: Colors.black)],
+          ),
+          floatingActionButton: !_isSelectionMode
+              ? FloatingActionButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/import-modules');
+            },
+            backgroundColor: Colors.blue,
+            child: const Icon(Icons.download, color: Colors.white),
+          )
+              : null,
+          body: RefreshIndicator(
+            key: _refreshIndicatorKey,
+            onRefresh: _refreshModules,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Container(
+                color: Colors.transparent,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Consumer<BackendProvider>(
+                  builder: (context, provider, _) {
+                    if (provider.isLoading) {
+                      return const Center(child: Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: CircularProgressIndicator(),
+                      ));
+                    }
+
+                    if (provider.error != null) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.error, size: 48, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text('Fehler: ${provider.error}'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _refreshModules,
+                              child: const Text('Erneut versuchen'),
                             ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Consumer<BackendProvider>(
-                    builder: (context, provider, _) {
-                      if (provider.isLoading) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-
-                      if (provider.error != null) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text('Fehler: ${provider.error}'),
-                        );
-                      }
-
-                      debugPrint(
-                        'ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}',
-                      );
-
-                      // Laden der Fortschritte aus Supabase
-                      return FutureBuilder<Map<int, Map<String, dynamic>>>(
-                        future: provider.loadUserProgressForModules(
-                          provider.lastModules,
+                          ],
                         ),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(24.0),
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          }
-
-                          if (snapshot.hasError) {
-                            debugPrint(
-                              '❌ Error loading progress: ${snapshot.error}',
-                            );
-                            // Fallback ohne Fortschritte
-                            return _buildModuleList(provider.lastModules, {});
-                          }
-
-                          final progressMap = snapshot.data ?? {};
-                          final filteredModules = _query.isEmpty
-                              ? provider.lastModules
-                              : provider.lastModules.where((m) {
-                                  final name = m.name.toLowerCase();
-                                  final desc = (m.description ?? '')
-                                      .toLowerCase();
-                                  final q = _query.toLowerCase();
-                                  return name.contains(q) || desc.contains(q);
-                                }).toList();
-                          return _buildModuleList(filteredModules, progressMap);
-                        },
                       );
-                    },
-                  ),
-                ],
+                    }
+
+                    // Module aus Provider laden und in _currentModules speichern
+                    _currentModules = provider.lastModules.map((lm) {
+                      return Module(
+                        id: lm.id,
+                        title: lm.name,
+                        description: lm.description ?? '',
+                        totalLessons: 0,
+                        completedLessons: 0,
+                        progress: 0.0,
+                        iconColor: Colors.blue,
+                        icon: Icons.book,
+                      );
+                    }).toList();
+
+                    if (_currentModules.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.library_books, size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Keine Module gefunden',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Importiere neue Module über das Download-Symbol',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/import-modules');
+                              },
+                              icon: const Icon(Icons.download),
+                              label: const Text('Module importieren'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        if (!_isSelectionMode) // Nur zeigen, wenn nicht im Auswahlmodus
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info, color: Colors.blue, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _isSelectionMode
+                                        ? 'Wähle Module aus zum Löschen'
+                                        : 'Langer Klick auf ein Modul zum Auswählen',
+                                    style: TextStyle(
+                                      color: Colors.blue[800],
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _currentModules.length,
+                          itemBuilder: (context, index) {
+                            final module = _currentModules[index];
+                            return ModuleCard(
+                              module: module,
+                              isSelected: module.id != null && _selectedModuleIds.contains(module.id),
+                              isSelectionMode: _isSelectionMode,
+                              onLongPress: () {
+                                if (!_isSelectionMode) {
+                                  _enterSelectionMode();
+                                }
+                                if (module.id != null) {
+                                  _toggleSelection(module.id!);
+                                }
+                              },
+                              onTap: () {
+                                if (_isSelectionMode && module.id != null) {
+                                  _toggleSelection(module.id!);
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => LessonListScreen(module: module),
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
         ),
       ],
-    );
-  }
-
-  /// Baut die Liste der Module mit Fortschritten
-  Widget _buildModuleList(
-    List<LernenModule> lernenModules,
-    Map<int, Map<String, dynamic>> progressMap,
-  ) {
-    // Konvertiere LernenModule -> lokale Module-View-Model mit Fortschritten
-    final modules = lernenModules.map((lm) {
-      final progress = progressMap[lm.id];
-      final moduleProgress = (progress?['progress'] as double?) ?? 0.0;
-      final isCompleted = moduleProgress >= 1.0;
-
-      if (lm.id != null) {
-        _moduleTitles[lm.id] = lm.name;
-      }
-
-      return Module(
-        id: lm.id,
-        title: lm.name,
-        description: lm.description ?? '',
-        totalLessons: 0,
-        completedLessons: 0,
-        progress: moduleProgress,
-        iconColor: Colors.blue,
-        icon: Icons.book,
-        isCompleted: isCompleted,
-      );
-    }).toList();
-
-    if (modules.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No modules found.'),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: modules.length,
-      itemBuilder: (context, index) {
-        final module = modules[index];
-        return ModuleCard(
-          module: module,
-          selectionMode: _selectionMode,
-          isSelected:
-              module.id != null && _selectedModuleIds.contains(module.id),
-          onTap: () {
-            if (_selectionMode) {
-              _toggleModuleSelection(module.id);
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => LessonListScreen(module: module),
-                ),
-              );
-            }
-          },
-          onLongPress: () => _toggleModuleSelection(module.id),
-        );
-      },
     );
   }
 }

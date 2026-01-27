@@ -470,7 +470,18 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             showArrow: true, // "Go" anzeigen
           ),
-
+          // NEU: Import Modules Karte hinzufügen
+          const SizedBox(height: 12),
+          CategoryCard(
+          icon: Icons.download,
+          title: 'Import Modules',
+          subtitle: 'Download new modules from server',
+          iconColor: Colors.purple,
+          onTap: () {
+          Navigator.pushNamed(context, '/import-modules');
+          },
+          showArrow: true,
+          ),
           const SizedBox(height: 32),
         ],
       ),
