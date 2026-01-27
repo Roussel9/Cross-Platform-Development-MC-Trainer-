@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
+import 'package:mc_trainer_kami/provider/home_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -40,9 +42,8 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (_) => BackendProvider()..fetchModules(),
         ),
-        Provider<AuthService>(
-          create: (_) => AuthService(),
-        ),
+        ChangeNotifierProvider(create: (_) => HomeProvider()),
+        Provider<AuthService>(create: (_) => AuthService()),
       ],
       child: const MyApp(),
     ),
