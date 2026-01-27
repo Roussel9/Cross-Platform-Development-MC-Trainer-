@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/widgets/custom_app_appbar.dart';
 import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
-// Import des neuen Lesson Screens für die Navigation
+import 'package:share_plus/share_plus.dart';
 import 'lesson_list_screen.dart';
 
 // Quiz-Set für die erste Lektion "Atomic Structure"
@@ -297,8 +297,19 @@ class LessonTile extends StatelessWidget {
 // Widget für eine Modul-Karte (mit Aufklappfunktion und Navigation)
 class ModuleCard extends StatefulWidget {
   final Module module;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final bool isSelected;
+  final bool selectionMode;
 
-  const ModuleCard({super.key, required this.module});
+  const ModuleCard({
+    super.key,
+    required this.module,
+    this.onTap,
+    this.onLongPress,
+    this.isSelected = false,
+    this.selectionMode = false,
+  });
 
   @override
   State<ModuleCard> createState() => _ModuleCardState();
@@ -330,8 +341,11 @@ class _ModuleCardState extends State<ModuleCard> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: widget.isSelected ? Colors.blue.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: widget.isSelected
+            ? Border.all(color: Colors.blue, width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -354,7 +368,8 @@ class _ModuleCardState extends State<ModuleCard> {
             },
             child: GestureDetector(
               // 2. TAP (Mobile/Desktop): Navigiere zur Detailseite
-              onTap: () => _navigateToLessons(context),
+              onTap: widget.onTap ?? () => _navigateToLessons(context),
+              onLongPress: widget.onLongPress,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -458,29 +473,117 @@ class _ModuleCardState extends State<ModuleCard> {
                       ],
                     ),
                   ),
-                  // Chevron-Icon
+                  // Chevron-Icon oder Auswahlstatus
                   Padding(
                     padding: const EdgeInsets.only(left: 8.0, top: 10),
-                    child: Icon(
-                      Icons
-                          .keyboard_arrow_right, // Immer der Pfeil nach rechts für Navigation
-                      color: Colors.grey,
-                    ),
+                    child: widget.selectionMode
+                        ? Icon(
+                            widget.isSelected
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            color: widget.isSelected
+                                ? Colors.blue
+                                : Colors.grey,
+                          )
+                        : const Icon(
+                            Icons.keyboard_arrow_right,
+                            color: Colors.grey,
+                          ),
                   ),
                 ],
               ),
             ),
           ),
+
+          // --- EXPANDABLE BODY (Aufklappbarer Bereich bei Hover) ---
+          if (hasLessons && isExpanded)
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: widget.module.lessons.map((lesson) {
+                  return LessonTile(
+                    lesson: lesson,
+                  ); // Verwenden der lokalen LessonTile
+                }).toList(),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-// --- 4. DER HAUPT-SCREEN (Bleibt unverändert) ---
-class ModuleListScreen extends StatelessWidget {
-  // ... (Rest des Codes bleibt gleich)
+// --- 4. DER HAUPT-SCREEN ---
+class ModuleListScreen extends StatefulWidget {
   const ModuleListScreen({super.key});
+
+  @override
+  State<ModuleListScreen> createState() => _ModuleListScreenState();
+}
+
+class _ModuleListScreenState extends State<ModuleListScreen> {
+  String _query = '';
+  final Set<int> _selectedModuleIds = {};
+  final Map<int, String> _moduleTitles = {};
+
+  bool get _selectionMode => _selectedModuleIds.isNotEmpty;
+
+  void _toggleModuleSelection(int? id) {
+    if (id == null) return;
+    setState(() {
+      if (_selectedModuleIds.contains(id)) {
+        _selectedModuleIds.remove(id);
+      } else {
+        _selectedModuleIds.add(id);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedModuleIds.clear();
+    });
+  }
+
+  Future<void> _deleteSelectedModules(BackendProvider provider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Module löschen?'),
+          content: Text(
+            'Möchtest du ${_selectedModuleIds.length} Modul(e) wirklich löschen?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Löschen'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await provider.deleteModules(_selectedModuleIds.toList());
+      _clearSelection();
+    }
+  }
+
+  Future<void> _shareSelectedModules() async {
+    final titles = _selectedModuleIds
+        .map((id) => _moduleTitles[id])
+        .whereType<String>()
+        .toList();
+    if (titles.isEmpty) return;
+    final text = 'Meine Module:\n- ${titles.join('\n- ')}';
+    await Share.share(text);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -496,26 +599,82 @@ class ModuleListScreen extends StatelessWidget {
         ),
         Scaffold(
           backgroundColor: Colors.transparent,
-          appBar: CustomAppBar(
-            title: 'Browse Modules',
-            subtitle: 'Explore and learn from our comprehensive module library',
-            showBackButton: true,
-            backgroundColor: Colors.white,
-            actions: [AppBarActions(iconColor: Colors.black)],
-          ),
+          appBar: _selectionMode
+              ? AppBar(
+                  title: Text('${_selectedModuleIds.length} selected'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _clearSelection,
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _deleteSelectedModules(
+                        Provider.of<BackendProvider>(context, listen: false),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.share),
+                      onPressed: _shareSelectedModules,
+                    ),
+                  ],
+                )
+              : CustomAppBar(
+                  title: 'Browse Modules',
+                  subtitle:
+                      'Explore and learn from our comprehensive module library',
+                  showBackButton: true,
+                  backgroundColor: Colors.white,
+                  actions: [AppBarActions(iconColor: Colors.black)],
+                ),
           body: SingleChildScrollView(
             child: Container(
               color: Colors.transparent,
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Column(
                 children: [
+                  // Suchleiste
+                  TextField(
+                    onChanged: (value) {
+                      setState(() {
+                        _query = value.trim();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Module suchen...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _query = '';
+                                });
+                              },
+                            ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Consumer<BackendProvider>(
                     builder: (context, provider, _) {
                       if (provider.isLoading) {
-                        return const Center(child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: CircularProgressIndicator(),
-                        ));
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
                       }
 
                       if (provider.error != null) {
@@ -525,34 +684,45 @@ class ModuleListScreen extends StatelessWidget {
                         );
                       }
 
-                      debugPrint('ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}');
-                      // Konvertiere LernenModule -> lokale Module-View-Model
-                      final modules = provider.lastModules.map((lm) {
-                        return Module(
-                          id: lm.id,
-                          title: lm.name,
-                          description: lm.description ?? '',
-                          totalLessons: 0,
-                          completedLessons: 0,
-                          progress: 0.0,
-                          iconColor: Colors.blue,
-                          icon: Icons.book,
-                        );
-                      }).toList();
+                      debugPrint(
+                        'ModuleListScreen: provider.lastModules.length = ${provider.lastModules.length}',
+                      );
 
-                      if (modules.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text('No modules found.'),
-                        );
-                      }
+                      // Laden der Fortschritte aus Supabase
+                      return FutureBuilder<Map<int, Map<String, dynamic>>>(
+                        future: provider.loadUserProgressForModules(
+                          provider.lastModules,
+                        ),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
 
-                      return ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: modules.length,
-                        itemBuilder: (context, index) {
-                          return ModuleCard(module: modules[index]);
+                          if (snapshot.hasError) {
+                            debugPrint(
+                              '❌ Error loading progress: ${snapshot.error}',
+                            );
+                            // Fallback ohne Fortschritte
+                            return _buildModuleList(provider.lastModules, {});
+                          }
+
+                          final progressMap = snapshot.data ?? {};
+                          final filteredModules = _query.isEmpty
+                              ? provider.lastModules
+                              : provider.lastModules.where((m) {
+                                  final name = m.name.toLowerCase();
+                                  final desc = (m.description ?? '')
+                                      .toLowerCase();
+                                  final q = _query.toLowerCase();
+                                  return name.contains(q) || desc.contains(q);
+                                }).toList();
+                          return _buildModuleList(filteredModules, progressMap);
                         },
                       );
                     },
@@ -563,6 +733,70 @@ class ModuleListScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// Baut die Liste der Module mit Fortschritten
+  Widget _buildModuleList(
+    List<LernenModule> lernenModules,
+    Map<int, Map<String, dynamic>> progressMap,
+  ) {
+    // Konvertiere LernenModule -> lokale Module-View-Model mit Fortschritten
+    final modules = lernenModules.map((lm) {
+      final progress = progressMap[lm.id];
+      final moduleProgress = (progress?['progress'] as double?) ?? 0.0;
+      final isCompleted = moduleProgress >= 1.0;
+
+      if (lm.id != null) {
+        _moduleTitles[lm.id] = lm.name;
+      }
+
+      return Module(
+        id: lm.id,
+        title: lm.name,
+        description: lm.description ?? '',
+        totalLessons: 0,
+        completedLessons: 0,
+        progress: moduleProgress,
+        iconColor: Colors.blue,
+        icon: Icons.book,
+        isCompleted: isCompleted,
+      );
+    }).toList();
+
+    if (modules.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('No modules found.'),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: modules.length,
+      itemBuilder: (context, index) {
+        final module = modules[index];
+        return ModuleCard(
+          module: module,
+          selectionMode: _selectionMode,
+          isSelected:
+              module.id != null && _selectedModuleIds.contains(module.id),
+          onTap: () {
+            if (_selectionMode) {
+              _toggleModuleSelection(module.id);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LessonListScreen(module: module),
+                ),
+              );
+            }
+          },
+          onLongPress: () => _toggleModuleSelection(module.id),
+        );
+      },
     );
   }
 }
