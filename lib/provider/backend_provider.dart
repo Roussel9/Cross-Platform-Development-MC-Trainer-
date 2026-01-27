@@ -371,10 +371,6 @@ class BackendProvider with ChangeNotifier {
           ),
         );
       });
-
-      print('test 1:' + achievements.length.toString());
-      print('test 2:' + myAchievements.length.toString());
-      print('\n It is just a second test ' + achieved[0].toString() + '\n');
     } catch (e) {
       error = 'Diese Daten konnten nicht geladen werden.';
       print('Fehler: $e');
@@ -1152,8 +1148,6 @@ class BackendProvider with ChangeNotifier {
   }
   // In backend_provider.dart - NEUE IMPORT-METHODEN
 
-
-
   Future<void> fetchImportableModules() async {
     isLoading = true;
     error = null;
@@ -1166,22 +1160,21 @@ class BackendProvider with ChangeNotifier {
       print('🔍 Lade importierbare Module für User: ${user.id}');
 
       // 1. Module, die dieser User bereits importiert hat
-      final importedByUser = await _supabase
-          .from('imported_modules')
-          .select('module_id')
-          .eq('user_id', user.id)
-      as List<dynamic>;
+      final importedByUser =
+          await _supabase
+                  .from('imported_modules')
+                  .select('module_id')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
 
       final importedModuleIds = importedByUser
           .map((im) => im['module_id'] as int)
           .toList();
 
       // 2. Default-Module aus der Datenbank (nicht importierbar)
-      final defaultModules = await _supabase
-          .from('modules')
-          .select('title')
-          .eq('default', true)
-      as List<dynamic>;
+      final defaultModules =
+          await _supabase.from('modules').select('title').eq('default', true)
+              as List<dynamic>;
 
       final defaultModuleTitles = defaultModules
           .map((dm) => dm['title'] as String)
@@ -1207,11 +1200,13 @@ class BackendProvider with ChangeNotifier {
         if (isDefaultModule) {
           // Default-Module: Prüfe ob der User es "hat" (in imported_modules)
           // Finde die module_id in der modules Tabelle
-          final moduleInDb = await _supabase
-              .from('modules')
-              .select('id')
-              .eq('title', title)
-              .maybeSingle() as Map<String, dynamic>?;
+          final moduleInDb =
+              await _supabase
+                      .from('modules')
+                      .select('id')
+                      .eq('title', title)
+                      .maybeSingle()
+                  as Map<String, dynamic>?;
 
           bool isImportedByUser = false;
           if (moduleInDb != null) {
@@ -1219,23 +1214,27 @@ class BackendProvider with ChangeNotifier {
             isImportedByUser = importedModuleIds.contains(dbModuleId);
           }
 
-          availableModules.add(ImportableModule(
-            id: externalId,
-            title: title,
-            description: extModMap['description'] as String,
-            icon: extModMap['icon'] as String,
-            color: extModMap['color'] as String,
-            isDefault: true,
-            isImported: isImportedByUser,
-            serverUrl: extModMap['server_url'] as String?,
-          ));
+          availableModules.add(
+            ImportableModule(
+              id: externalId,
+              title: title,
+              description: extModMap['description'] as String,
+              icon: extModMap['icon'] as String,
+              color: extModMap['color'] as String,
+              isDefault: true,
+              isImported: isImportedByUser,
+              serverUrl: extModMap['server_url'] as String?,
+            ),
+          );
         } else {
           // Nicht-Default Module: Prüfe ob es bereits in modules existiert
-          final moduleInDb = await _supabase
-              .from('modules')
-              .select('id')
-              .eq('title', title)
-              .maybeSingle() as Map<String, dynamic>?;
+          final moduleInDb =
+              await _supabase
+                      .from('modules')
+                      .select('id')
+                      .eq('title', title)
+                      .maybeSingle()
+                  as Map<String, dynamic>?;
 
           bool isImportedByUser = false;
           if (moduleInDb != null) {
@@ -1243,16 +1242,18 @@ class BackendProvider with ChangeNotifier {
             isImportedByUser = importedModuleIds.contains(dbModuleId);
           }
 
-          availableModules.add(ImportableModule(
-            id: externalId,
-            title: title,
-            description: extModMap['description'] as String,
-            icon: extModMap['icon'] as String,
-            color: extModMap['color'] as String,
-            isDefault: false,
-            isImported: isImportedByUser,
-            serverUrl: extModMap['server_url'] as String?,
-          ));
+          availableModules.add(
+            ImportableModule(
+              id: externalId,
+              title: title,
+              description: extModMap['description'] as String,
+              icon: extModMap['icon'] as String,
+              color: extModMap['color'] as String,
+              isDefault: false,
+              isImported: isImportedByUser,
+              serverUrl: extModMap['server_url'] as String?,
+            ),
+          );
         }
       }
 
@@ -1260,7 +1261,9 @@ class BackendProvider with ChangeNotifier {
 
       // Debug-Ausgabe
       for (var module in availableModules) {
-        print('   - ${module.title}: Default=${module.isDefault}, Imported=${module.isImported}');
+        print(
+          '   - ${module.title}: Default=${module.isDefault}, Imported=${module.isImported}',
+        );
       }
     } catch (e) {
       error = 'Konnte importierbare Module nicht laden: $e';
@@ -1271,9 +1274,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-
-
-// Korrigierte importModule Methode:
+  // Korrigierte importModule Methode:
 
   Future<bool> importModule(ImportableModule module) async {
     isLoading = true;
@@ -1290,11 +1291,13 @@ class BackendProvider with ChangeNotifier {
 
       // 1. Prüfe ob das Modul bereits existiert
       print('🔍 Prüfe ob Modul bereits existiert...');
-      final existingModule = await _supabase
-          .from('modules')
-          .select('id, default')
-          .eq('title', module.title)
-          .maybeSingle() as Map<String, dynamic>?;
+      final existingModule =
+          await _supabase
+                  .from('modules')
+                  .select('id, default')
+                  .eq('title', module.title)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       late final dynamic moduleId;
       bool isNewModule = false;
@@ -1323,11 +1326,13 @@ class BackendProvider with ChangeNotifier {
           'created_at': DateTime.now().toIso8601String(),
         };
 
-        final result = await _supabase
-            .from('modules')
-            .insert(moduleData)
-            .select('id')
-            .single() as Map<String, dynamic>;
+        final result =
+            await _supabase
+                    .from('modules')
+                    .insert(moduleData)
+                    .select('id')
+                    .single()
+                as Map<String, dynamic>;
 
         moduleId = result['id'];
         isNewModule = true;
@@ -1342,7 +1347,9 @@ class BackendProvider with ChangeNotifier {
         'user_id': user.id,
         'imported_at': DateTime.now().toIso8601String(),
         'download_count': 1,
-        'server_url': module.serverUrl ?? 'https://trainingserver.example.com', // JETZT FUNKTIONIERT DAS!
+        'server_url':
+            module.serverUrl ??
+            'https://trainingserver.example.com', // JETZT FUNKTIONIERT DAS!
       };
 
       // DEBUG: Zeige was gesendet wird
@@ -1353,7 +1360,9 @@ class BackendProvider with ChangeNotifier {
 
       // Prüfe ob versehentlich ein 'id' Feld existiert
       if (importData.containsKey('id')) {
-        print('⚠️ WARNUNG: importData enthält ein "id" Feld! Das wird entfernt...');
+        print(
+          '⚠️ WARNUNG: importData enthält ein "id" Feld! Das wird entfernt...',
+        );
         importData.remove('id');
       }
 
@@ -1373,11 +1382,15 @@ class BackendProvider with ChangeNotifier {
         // Teste direkt mit SQL
         print('🔧 Teste mit SQL Query...');
         try {
-          final testResult = await _supabase.rpc('debug_insert', params: {
-            'p_module_id': moduleId,
-            'p_user_id': user.id,
-            'p_server_url': module.serverUrl ?? 'https://trainingserver.example.com'
-          });
+          final testResult = await _supabase.rpc(
+            'debug_insert',
+            params: {
+              'p_module_id': moduleId,
+              'p_user_id': user.id,
+              'p_server_url':
+                  module.serverUrl ?? 'https://trainingserver.example.com',
+            },
+          );
           print('SQL Test Result: $testResult');
         } catch (sqlError) {
           print('SQL Test auch fehlgeschlagen: $sqlError');
@@ -1386,8 +1399,10 @@ class BackendProvider with ChangeNotifier {
         rethrow;
       }
 
-     // await _supabase.from('imported_modules').insert(importData);
-      print('✅ Import-Eintrag erfolgreich erstellt mit server_url: ${importData['server_url']}');
+      // await _supabase.from('imported_modules').insert(importData);
+      print(
+        '✅ Import-Eintrag erfolgreich erstellt mit server_url: ${importData['server_url']}',
+      );
 
       // 4. Beispiel-Submodule nur für neue Module
       if (isNewModule) {
@@ -1408,7 +1423,9 @@ class BackendProvider with ChangeNotifier {
           isImported: true,
           serverUrl: module.serverUrl,
         );
-        print('🔄 UI-Status aktualisiert: ${module.title} ist jetzt importiert');
+        print(
+          '🔄 UI-Status aktualisiert: ${module.title} ist jetzt importiert',
+        );
       }
 
       // 6. Module-Liste neu laden
@@ -1424,7 +1441,9 @@ class BackendProvider with ChangeNotifier {
       // Detaillierte Fehleranalyse
       if (e.toString().contains('server_url')) {
         error = 'Datenbankfehler: Problem mit server_url Spalte. ';
-        print('⚠️ Bitte prüfe ob die server_url Spalte in imported_modules existiert');
+        print(
+          '⚠️ Bitte prüfe ob die server_url Spalte in imported_modules existiert',
+        );
       }
 
       return false;
@@ -1443,7 +1462,8 @@ class BackendProvider with ChangeNotifier {
       {
         'id': 101,
         'title': 'Advanced Mathematics',
-        'description': 'Master advanced mathematical concepts and problem-solving',
+        'description':
+            'Master advanced mathematical concepts and problem-solving',
         'icon': 'calculate',
         'color': '#5E35B1',
         'server_url': 'https://trainingserver.example.com/modules/math',
@@ -1502,11 +1522,13 @@ class BackendProvider with ChangeNotifier {
   // Methode um zu prüfen, ob ein Modul importierbar ist (nicht default)
   Future<bool> isModuleImportable(String title) async {
     try {
-      final result = await _supabase
-          .from('modules')
-          .select('default')
-          .eq('title', title)
-          .maybeSingle() as Map<String, dynamic>?;
+      final result =
+          await _supabase
+                  .from('modules')
+                  .select('default')
+                  .eq('title', title)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       return result == null || (result['default'] as bool?) == false;
     } catch (e) {
@@ -1514,17 +1536,18 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-// Methode um User-spezifische importierte Module zu holen
+  // Methode um User-spezifische importierte Module zu holen
   Future<List<dynamic>> getUserImportedModules() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return [];
 
     try {
-      final imported = await _supabase
-          .from('imported_modules')
-          .select('module_id')
-          .eq('user_id', user.id)
-      as List<dynamic>;
+      final imported =
+          await _supabase
+                  .from('imported_modules')
+                  .select('module_id')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
 
       return imported;
     } catch (e) {
@@ -1532,9 +1555,10 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-
-
-  Future<void> _addSampleSubmodules(dynamic moduleId, ImportableModule module) async {
+  Future<void> _addSampleSubmodules(
+    dynamic moduleId,
+    ImportableModule module,
+  ) async {
     List<Map<String, dynamic>> submodules = [];
 
     switch (module.title) {
@@ -1603,7 +1627,7 @@ class BackendProvider with ChangeNotifier {
         ];
         break;
       default:
-      // Generische Submodule für unbekannte Module
+        // Generische Submodule für unbekannte Module
         submodules = [
           {
             'modules_id': moduleId,
@@ -1634,7 +1658,7 @@ class BackendProvider with ChangeNotifier {
 
   // In BackendProvider Klasse, nach den anderen Methoden:
 
-// Prüft ob ein Modul für den User sichtbar ist (in imported_modules vorhanden)
+  // Prüft ob ein Modul für den User sichtbar ist (in imported_modules vorhanden)
   // Ersetze diese Methode:
   Future<bool> isModuleAvailableToUser(int moduleId) async {
     try {
@@ -1647,11 +1671,13 @@ class BackendProvider with ChangeNotifier {
       // 2. Es in imported_modules für diesen User existiert
 
       // Zuerst: Ist es ein Standard-Modul?
-      final module = await _supabase
-          .from('modules')
-          .select('default, title')
-          .eq('id', moduleId)
-          .maybeSingle() as Map<String, dynamic>?;
+      final module =
+          await _supabase
+                  .from('modules')
+                  .select('default, title')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       if (module == null) return false; // Modul existiert gar nicht
 
@@ -1662,12 +1688,14 @@ class BackendProvider with ChangeNotifier {
         return true;
       } else {
         // Nicht-Standard Module: Prüfe ob importiert
-        final imported = await _supabase
-            .from('imported_modules')
-            .select('id')
-            .eq('module_id', moduleId)
-            .eq('user_id', user.id)
-            .maybeSingle() as Map<String, dynamic>?;
+        final imported =
+            await _supabase
+                    .from('imported_modules')
+                    .select('id')
+                    .eq('module_id', moduleId)
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+                as Map<String, dynamic>?;
 
         return imported != null;
       }
@@ -1677,14 +1705,16 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-// Prüft ob ein Modul ein Standard-Modul ist
+  // Prüft ob ein Modul ein Standard-Modul ist
   Future<bool> isModuleDefault(int moduleId) async {
     try {
-      final module = await _supabase
-          .from('modules')
-          .select('default')
-          .eq('id', moduleId)
-          .maybeSingle() as Map<String, dynamic>?;
+      final module =
+          await _supabase
+                  .from('modules')
+                  .select('default')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       return module != null && (module['default'] as bool?) == true;
     } catch (e) {
@@ -1693,7 +1723,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-// Löscht ein Modul (für den aktuellen User)
+  // Löscht ein Modul (für den aktuellen User)
   Future<bool> deleteModule(int moduleId, String moduleTitle) async {
     isLoading = true;
     notifyListeners();
@@ -1708,11 +1738,13 @@ class BackendProvider with ChangeNotifier {
       print('🗑️ Versuche Modul zu löschen: $moduleTitle (ID: $moduleId)');
 
       // 1. Hole Modul-Daten um festzustellen ob es Standard ist
-      final moduleData = await _supabase
-          .from('modules')
-          .select('default, title')
-          .eq('id', moduleId)
-          .maybeSingle() as Map<String, dynamic>?;
+      final moduleData =
+          await _supabase
+                  .from('modules')
+                  .select('default, title')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
       if (moduleData == null) {
         print('❌ Modul nicht gefunden');
@@ -1735,12 +1767,14 @@ class BackendProvider with ChangeNotifier {
         print('ℹ️ Modul ist ein Standard-Modul');
 
         // Prüfe ob der User es importiert hat
-        final imported = await _supabase
-            .from('imported_modules')
-            .select('id')
-            .eq('module_id', moduleId)
-            .eq('user_id', user.id)
-            .maybeSingle() as Map<String, dynamic>?;
+        final imported =
+            await _supabase
+                    .from('imported_modules')
+                    .select('id')
+                    .eq('module_id', moduleId)
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+                as Map<String, dynamic>?;
 
         if (imported != null) {
           // Aus imported_modules entfernen (wenn vorhanden)
@@ -1756,7 +1790,6 @@ class BackendProvider with ChangeNotifier {
         }
 
         print('✅ Standard-Modul für diesen User entfernt');
-
       } else {
         // --- IMPORTIERTES MODUL (nicht Standard) ---
         print('ℹ️ Modul ist ein importiertes Modul');
@@ -1771,27 +1804,30 @@ class BackendProvider with ChangeNotifier {
 
         // 4. Prüfe ob es von anderen Usern verwendet wird
         print('🔍 Prüfe ob Modul noch von anderen Usern verwendet wird...');
-        final otherUsers = await _supabase
-            .from('imported_modules')
-            .select('id')
-            .eq('module_id', moduleId)
-            .neq('user_id', user.id) as List<dynamic>;
+        final otherUsers =
+            await _supabase
+                    .from('imported_modules')
+                    .select('id')
+                    .eq('module_id', moduleId)
+                    .neq('user_id', user.id)
+                as List<dynamic>;
 
         if (otherUsers.isEmpty) {
-          print('🔴 Modul wird von keinem anderen User verwendet - lösche komplett...');
+          print(
+            '🔴 Modul wird von keinem anderen User verwendet - lösche komplett...',
+          );
 
           // Zuerst abhängige Daten löschen
           await _deleteDependentData(moduleId);
 
           // Dann das Modul selbst
-          await _supabase
-              .from('modules')
-              .delete()
-              .eq('id', moduleId);
+          await _supabase.from('modules').delete().eq('id', moduleId);
 
           print('✅ Modul komplett aus der Datenbank gelöscht');
         } else {
-          print('ℹ️ Modul wird noch von anderen Usern verwendet - nur für diesen User entfernt');
+          print(
+            'ℹ️ Modul wird noch von anderen Usern verwendet - nur für diesen User entfernt',
+          );
         }
       }
 
@@ -1810,25 +1846,29 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-// Hilfsmethode zum Löschen abhängiger Daten (nur für nicht-standard Module)
+  // Hilfsmethode zum Löschen abhängiger Daten (nur für nicht-standard Module)
   Future<void> _deleteDependentData(int moduleId) async {
     try {
       print('🗑️ Lösche abhängige Daten für Modul $moduleId...');
 
       // 1. Alle Submodules dieses Moduls finden
-      final submodules = await _supabase
-          .from('submodules')
-          .select('id')
-          .eq('modules_id', moduleId) as List<dynamic>;
+      final submodules =
+          await _supabase
+                  .from('submodules')
+                  .select('id')
+                  .eq('modules_id', moduleId)
+              as List<dynamic>;
 
       final submoduleIds = submodules.map((s) => s['id']).toList();
 
       if (submoduleIds.isNotEmpty) {
         // 2. Alle Questions für diese Submodules finden
-        final questions = await _supabase
-            .from('questions')
-            .select('id')
-            .inFilter('submodule_id', submoduleIds) as List<dynamic>;
+        final questions =
+            await _supabase
+                    .from('questions')
+                    .select('id')
+                    .inFilter('submodule_id', submoduleIds)
+                as List<dynamic>;
 
         final questionIds = questions.map((q) => q['id']).toList();
 
@@ -1859,14 +1899,13 @@ class BackendProvider with ChangeNotifier {
             .inFilter('submodule_id', submoduleIds);
 
         // 7. Submodules löschen
-        await _supabase
-            .from('submodules')
-            .delete()
-            .eq('modules_id', moduleId);
+        await _supabase.from('submodules').delete().eq('modules_id', moduleId);
       }
 
       // 8. Learning sessions für dieses Modul löschen
-      final submoduleIdsForSessions = submoduleIds.isNotEmpty ? submoduleIds : [0];
+      final submoduleIdsForSessions = submoduleIds.isNotEmpty
+          ? submoduleIds
+          : [0];
       await _supabase
           .from('learning_sessions')
           .delete()
@@ -1878,7 +1917,6 @@ class BackendProvider with ChangeNotifier {
       // Wir fahren trotzdem fort
     }
   }
-
 }
 
 // --- Home Screen ---
