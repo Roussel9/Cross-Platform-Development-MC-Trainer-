@@ -473,14 +473,14 @@ class _HomeScreenState extends State<HomeScreen> {
           // NEU: Import Modules Karte hinzufügen
           const SizedBox(height: 12),
           CategoryCard(
-          icon: Icons.download,
-          title: 'Import Modules',
-          subtitle: 'Download new modules from server',
-          iconColor: Colors.purple,
-          onTap: () {
-          Navigator.pushNamed(context, '/import-modules');
-          },
-          showArrow: true,
+            icon: Icons.download,
+            title: 'Import Modules',
+            subtitle: 'Download new modules from server',
+            iconColor: Colors.purple,
+            onTap: () {
+              Navigator.pushNamed(context, '/import-modules');
+            },
+            showArrow: true,
           ),
           const SizedBox(height: 32),
         ],
@@ -506,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (home.currentStreak > 0) {
               backend.addAchievementFirstVisit();
             }
-            if (home.questionsThisWeek > 99) {
+            if (home.questionsThisWeek > 29) {
               backend.addAchievementModuleMaster();
             }
             if (home.submodulesCompleted > 9) {
@@ -515,7 +515,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (home.currentStreak > 0) {
               backend.addAchievementFirstVisit();
             }
-            if (backend.achievedPoint > 999) {
+            if (backend.achievedPoint > 1499) {
               backend.addAchievementTopOfClass();
             }
 
