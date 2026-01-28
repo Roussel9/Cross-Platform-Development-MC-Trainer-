@@ -221,12 +221,15 @@ Weitere optionale oder nicht explizit vorgegebene Punkte, die im Projekt vorkomm
 
 - Benachrichtigungen (`user_notifications`, NotificationScreen)
 - Profilbild-Upload (Storage `avatar_profile`)
-- Passwort vergessen / Reset (vorbereitet in `auth_service.dart`, ggf. UI auskommentiert)
 - Teilen-Funktion (`share_plus`)
 
 ---
 
-## 5. Weitere Hinweise für Softwareentwickler
+## 5. Potenzialerweiterung
+
+- Passwort vergessen / Reset (vorbereitet in `auth_service.dart`, ggf. UI auskommentiert): Frontend wurde schon gearbeitet
+
+## 6. Weitere Hinweise für Softwareentwickler
 
 - **Einstieg in den Code**:
     - `lib/main.dart` für Start, Supabase und Provider.
