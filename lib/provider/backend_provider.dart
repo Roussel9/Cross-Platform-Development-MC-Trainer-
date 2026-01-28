@@ -122,7 +122,6 @@ class BackendProvider with ChangeNotifier {
     // Lade initiale Home-Daten (falls möglich)
     fetchHomeData();
     fetchPoints();
-    addNotification('Erster Nachricht', 'Willkommen in mc-Trainer');
     fetchNotifications();
 
     // Beobachte Auth-Status; beim Login/Logout ggf. Module nachladen
@@ -213,16 +212,15 @@ class BackendProvider with ChangeNotifier {
                   .eq('achievement_id', achievementId)
               as List<dynamic>;
 
-      await _supabase
-          .from('user_profiles')
-          .update({'achieved_points': achievedPoint + (achievementId * 250)})
-          .eq('id', user.id);
-
       print('Achive--res: $res');
       if (res.isNotEmpty) {
         return false;
       } else {
-        print('TRY: Achive--res: $res');
+        await _supabase
+            .from('user_profiles')
+            .update({'achieved_points': achievedPoint + (achievementId * 250)})
+            .eq('id', user.id);
+
         await _supabase.from('user_achievements').insert({
           'user_id': user.id,
           //'unlocked_at': DateTime.now().toIso8601String(),
@@ -569,6 +567,7 @@ class BackendProvider with ChangeNotifier {
             : userName
                   .substring(0, (userName.length >= 2 ? 2 : userName.length))
                   .toUpperCase();
+        await fetchModules();
       }
 
       // --- Letzte Session abrufen ---
@@ -956,76 +955,147 @@ class BackendProvider with ChangeNotifier {
   }
 
   // Module separat laden (z.B. für Modules Screen)
+  // In BackendProvider - Ersetze die fetchModules Methode vollständig:
+
   Future<void> fetchModules() async {
     isLoading = true;
     notifyListeners();
 
     try {
-      debugPrint('fetchModules: querying supabase modules table...');
       final user = _supabase.auth.currentUser;
 
+      // Für nicht-eingeloggte User nur Default-Module
+      if (user == null) {
+        final defaultModules =
+            await _supabase.from('modules').select('*').eq('default', true)
+                as List<dynamic>;
+
+        lastModules = defaultModules.map((e) {
+          final m = e as Map<String, dynamic>;
+          return LernenModule(
+            id: m['id'] as int,
+            name: (m['title'] ?? '').toString(),
+            description: (m['description'] ?? '').toString(),
+          );
+        }).toList();
+
+        return;
+      }
+
+      // Für eingeloggte User:
+      // 1. Gelöschte Module für diesen User
+      final deletedModules =
+          await _supabase
+                  .from('deleted_modules')
+                  .select('module_id')
+                  .eq('user_id', user.id)
+              as List<dynamic>;
+
+      final deletedIds = deletedModules
+          .map((dm) => dm['module_id'] as int)
+          .toSet();
+
+      // 2. Importierte Module (nicht gelöscht)
+      final importedModules =
+          await _supabase
+                  .from('imported_modules')
+                  .select('module_id')
+                  .eq('user_id', user.id)
+                  .eq('is_deleted', false)
+              as List<dynamic>;
+
+      final importedIds = importedModules
+          .map((im) => im['module_id'] as int)
+          .toSet();
+
+      // 3. Hole alle Standard-Module (default = true)
       final defaultModules =
           await _supabase.from('modules').select('*').eq('default', true)
               as List<dynamic>;
 
-      List<dynamic> importedModules = [];
-      if (user != null) {
-        final imported =
+      // 4. Hole alle importierten Module
+      List<dynamic> importedModulesData = [];
+      if (importedIds.isNotEmpty) {
+        importedModulesData =
             await _supabase
-                    .from('imported_modules')
-                    .select('module_id')
-                    .eq('user_id', user.id)
+                    .from('modules')
+                    .select('*')
+                    .inFilter('id', importedIds.toList())
                 as List<dynamic>;
+      }
 
-        final importedIds = imported
-            .map((row) => row['module_id'])
-            .whereType<int>()
-            .toList();
+      // 5. Kombiniere alle Module
+      final combined = <int, Map<String, dynamic>>{};
 
-        if (importedIds.isNotEmpty) {
-          importedModules =
-              await _supabase
-                      .from('modules')
-                      .select('*')
-                      .inFilter('id', importedIds)
-                  as List<dynamic>;
+      // Füge Default-Module hinzu (außer gelöschte)
+      for (final e in defaultModules) {
+        final m = e as Map<String, dynamic>;
+        final id = m['id'] as int;
+        if (!deletedIds.contains(id)) {
+          combined[id] = m;
         }
       }
 
-      final combined = <int, Map<String, dynamic>>{};
-      for (final e in [...defaultModules, ...importedModules]) {
+      // Füge importierte Module hinzu
+      for (final e in importedModulesData) {
         final m = e as Map<String, dynamic>;
-        final idVal = m['id'];
-        final idInt = (idVal is int)
-            ? idVal
-            : (idVal is num
-                  ? idVal.toInt()
-                  : int.tryParse(idVal?.toString() ?? '0') ?? 0);
-        combined[idInt] = m;
+        final id = m['id'] as int;
+        combined[id] = m;
       }
 
-      debugPrint(
-        'fetchModules: received ${combined.length} rows (default + imported)',
-      );
-
+      // Konvertiere zu LernenModule Liste
       lastModules = combined.values.map((e) {
         final m = e as Map<String, dynamic>;
-        final idVal = m['id'];
-        final idInt = (idVal is int)
-            ? idVal
-            : (idVal is num
-                  ? idVal.toInt()
-                  : int.tryParse(idVal?.toString() ?? '0') ?? 0);
-        final nameVal = (m['title'] ?? m['name'] ?? '').toString();
-        final descVal = (m['description'] ?? '').toString();
-        debugPrint('fetchModules: row -> id=$idInt name=$nameVal');
-        return LernenModule(id: idInt, name: nameVal, description: descVal);
+        return LernenModule(
+          id: m['id'] as int,
+          name: (m['title'] ?? '').toString(),
+          description: (m['description'] ?? '').toString(),
+        );
       }).toList();
+
+      debugPrint(
+        '✅ Module geladen: ${lastModules.map((m) => m.name).toList()}',
+      );
+      debugPrint('📊 Statistik: ${lastModules.length} Module total');
+      debugPrint('   - Default Module: ${defaultModules.length}');
+      debugPrint('   - Importierte Module: ${importedModulesData.length}');
+      debugPrint('   - Gelöschte IDs: ${deletedIds.length}');
     } catch (e) {
       error = 'Konnte Module nicht laden: $e';
+      print('❌ Fehler in fetchModules: $e');
     } finally {
       isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> reImportModule(int moduleId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
+      // Entferne aus deleted_modules (für Standard-Module)
+      await _supabase
+          .from('deleted_modules')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('module_id', moduleId);
+
+      // Reaktiviere in imported_modules (für importierte Module)
+      await _supabase
+          .from('imported_modules')
+          .update({'is_deleted': false, 'deleted_at': null})
+          .eq('user_id', user.id)
+          .eq('module_id', moduleId);
+
+      // Listen aktualisieren
+      await fetchModules();
+      await fetchImportableModules();
+
+      return true;
+    } catch (e) {
+      print('❌ Re-Import Fehler: $e');
+      return false;
     }
   }
 
@@ -2255,6 +2325,10 @@ class BackendProvider with ChangeNotifier {
   }
   // In backend_provider.dart - NEUE IMPORT-METHODEN
 
+  // In BackendProvider - Erweitere die fetchImportableModules Methode:
+
+  // In BackendProvider - Korrigiere die Logik in fetchImportableModules:
+
   Future<void> fetchImportableModules() async {
     isLoading = true;
     error = null;
@@ -2266,115 +2340,77 @@ class BackendProvider with ChangeNotifier {
 
       print('🔍 Lade importierbare Module für User: ${user.id}');
 
-      // 1. Module, die dieser User bereits importiert hat
-      final importedByUser =
+      // 1. Lade ALLE nicht-Standard Module
+      final allNonDefaultModules =
+          await _supabase.from('modules').select('*').eq('default', false)
+              as List<dynamic>;
+
+      // 2. Lade Import-Status für diesen User
+      final importedEntries =
           await _supabase
                   .from('imported_modules')
-                  .select('module_id')
+                  .select('module_id, is_deleted, server_url, download_count')
                   .eq('user_id', user.id)
               as List<dynamic>;
 
-      final importedModuleIds = importedByUser
-          .map((im) => im['module_id'] as int)
-          .toList();
+      // 3. Erstelle Map für schnellen Zugriff
+      final importStatus = <int, Map<String, dynamic>>{};
+      for (var entry in importedEntries) {
+        final e = entry as Map<String, dynamic>;
+        final moduleId = e['module_id'] as int;
+        importStatus[moduleId] = {
+          'is_imported': true,
+          'is_deleted': (e['is_deleted'] as bool?) ?? false,
+          'server_url': e['server_url'] as String?,
+          'download_count': e['download_count'] as int? ?? 1,
+        };
+      }
 
-      // 2. Default-Module aus der Datenbank (nicht importierbar)
-      final defaultModules =
-          await _supabase.from('modules').select('title').eq('default', true)
-              as List<dynamic>;
-
-      final defaultModuleTitles = defaultModules
-          .map((dm) => dm['title'] as String)
-          .toList();
-
-      print('📊 Default Module: $defaultModuleTitles');
-      print('📊 Bereits importierte Module IDs: $importedModuleIds');
-
-      // 3. Externe Module simulieren
-      final externalModules = await _simulateExternalServerCall();
-
-      // 4. Liste aufbauen
+      // 4. Baue availableModules auf
       availableModules.clear();
 
-      for (var extMod in externalModules) {
-        final extModMap = extMod as Map<String, dynamic>;
-        final String title = extModMap['title'] as String;
-        final int externalId = extModMap['id'] as int;
+      for (var dbModule in allNonDefaultModules) {
+        final moduleMap = dbModule as Map<String, dynamic>;
+        final int moduleId = moduleMap['id'] as int;
+        final String title = moduleMap['title'] as String;
+        final String description = moduleMap['description'] as String? ?? '';
+        final String icon = moduleMap['icon'] as String? ?? 'book';
+        final String color = moduleMap['color'] as String? ?? '#4285F4';
 
-        // Prüfe ob es ein Default-Modul ist
-        final isDefaultModule = defaultModuleTitles.contains(title);
+        final status = importStatus[moduleId];
+        final bool isImported = status != null;
+        final bool isDeleted = status?['is_deleted'] == true;
 
-        if (isDefaultModule) {
-          // Default-Module: Prüfe ob der User es "hat" (in imported_modules)
-          // Finde die module_id in der modules Tabelle
-          final moduleInDb =
-              await _supabase
-                      .from('modules')
-                      .select('id')
-                      .eq('title', title)
-                      .maybeSingle()
-                  as Map<String, dynamic>?;
-
-          bool isImportedByUser = false;
-          if (moduleInDb != null) {
-            final int dbModuleId = moduleInDb['id'] as int;
-            isImportedByUser = importedModuleIds.contains(dbModuleId);
-          }
-
-          availableModules.add(
-            ImportableModule(
-              id: externalId,
-              title: title,
-              description: extModMap['description'] as String,
-              icon: extModMap['icon'] as String,
-              color: extModMap['color'] as String,
-              isDefault: true,
-              isImported: isImportedByUser,
-              serverUrl: extModMap['server_url'] as String?,
-            ),
-          );
-        } else {
-          // Nicht-Default Module: Prüfe ob es bereits in modules existiert
-          final moduleInDb =
-              await _supabase
-                      .from('modules')
-                      .select('id')
-                      .eq('title', title)
-                      .maybeSingle()
-                  as Map<String, dynamic>?;
-
-          bool isImportedByUser = false;
-          if (moduleInDb != null) {
-            final int dbModuleId = moduleInDb['id'] as int;
-            isImportedByUser = importedModuleIds.contains(dbModuleId);
-          }
-
-          availableModules.add(
-            ImportableModule(
-              id: externalId,
-              title: title,
-              description: extModMap['description'] as String,
-              icon: extModMap['icon'] as String,
-              color: extModMap['color'] as String,
-              isDefault: false,
-              isImported: isImportedByUser,
-              serverUrl: extModMap['server_url'] as String?,
-            ),
-          );
-        }
-      }
-
-      print('✅ ${availableModules.length} importierbare Module geladen');
-
-      // Debug-Ausgabe
-      for (var module in availableModules) {
-        print(
-          '   - ${module.title}: Default=${module.isDefault}, Imported=${module.isImported}',
+        availableModules.add(
+          ImportableModule(
+            id: moduleId,
+            title: title,
+            description: description,
+            icon: icon,
+            color: color,
+            isDefault: false,
+            isImported:
+                isImported &&
+                !isDeleted, // Gelöschte zählen nicht als importiert
+            isDeleted: isDeleted,
+            serverUrl:
+                status?['server_url'] as String? ??
+                'https://trainingserver.example.com',
+          ),
         );
       }
+
+      // Sortierung
+      availableModules.sort((a, b) {
+        if (a.isDeleted != b.isDeleted) return a.isDeleted ? 1 : -1;
+        if (a.isImported != b.isImported) return a.isImported ? 1 : -1;
+        return a.title.compareTo(b.title);
+      });
+
+      print('✅ ${availableModules.length} importierbare Module geladen');
     } catch (e) {
       error = 'Konnte importierbare Module nicht laden: $e';
-      print('❌ Fehler beim Laden importierbarer Module: $e');
+      print('❌ Fehler: $e');
     } finally {
       isLoading = false;
       notifyListeners();
@@ -2383,176 +2419,78 @@ class BackendProvider with ChangeNotifier {
 
   // Korrigierte importModule Methode:
 
+  // In BackendProvider - Ersetze die importModule Methode vollständig:
+
   Future<bool> importModule(ImportableModule module) async {
     isLoading = true;
     notifyListeners();
 
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) {
-        print('❌ Kein User eingeloggt');
-        return false;
-      }
+      if (user == null) return false;
 
-      print('🔄 Starte Import von: ${module.title} für User: ${user.id}');
+      print('🔄 Importiere Modul: ${module.title}');
 
-      // 1. Prüfe ob das Modul bereits existiert
-      print('🔍 Prüfe ob Modul bereits existiert...');
-      final existingModule =
+      // Prüfe ob bereits ein Import-Eintrag existiert
+      final existingImport =
           await _supabase
-                  .from('modules')
-                  .select('id, default')
-                  .eq('title', module.title)
+                  .from('imported_modules')
+                  .select('id, is_deleted, download_count')
+                  .eq('user_id', user.id)
+                  .eq('module_id', module.id)
                   .maybeSingle()
               as Map<String, dynamic>?;
 
-      late final dynamic moduleId;
-      bool isNewModule = false;
-
-      if (existingModule != null) {
-        print('📦 Modul existiert bereits: ${existingModule['id']}');
-        moduleId = existingModule['id'];
-
-        // Prüfe ob default bereits false ist
-        if ((existingModule['default'] as bool?) == true) {
-          print('🔄 Setze default auf false...');
-          await _supabase
-              .from('modules')
-              .update({'default': false})
-              .eq('id', moduleId);
-        }
+      if (existingImport == null) {
+        // Neuen Import erstellen
+        await _supabase.from('imported_modules').insert({
+          'module_id': module.id,
+          'user_id': user.id,
+          'server_url': module.serverUrl,
+          'download_count': 1,
+          'is_deleted': false,
+          'imported_at': DateTime.now().toIso8601String(),
+        });
+        print('✅ Neuer Import erstellt');
       } else {
-        // 2. Neues Modul erstellen
-        print('📥 Erstelle neues Modul...');
-        final moduleData = {
-          'title': module.title,
-          'description': module.description,
-          'icon': module.icon,
-          'color': module.color,
-          'default': false,
-          'created_at': DateTime.now().toIso8601String(),
-        };
+        // Bestehenden Import aktualisieren
+        final isCurrentlyDeleted =
+            (existingImport['is_deleted'] as bool?) == true;
+        final currentCount = (existingImport['download_count'] as int?) ?? 0;
 
-        final result =
-            await _supabase
-                    .from('modules')
-                    .insert(moduleData)
-                    .select('id')
-                    .single()
-                as Map<String, dynamic>;
-
-        moduleId = result['id'];
-        isNewModule = true;
-        print('✅ Neues Modul erstellt mit ID: $moduleId');
-      }
-
-      // 3. In imported_modules protokollieren (JETZT MIT server_url)
-      print('📝 Erstelle imported_modules Eintrag...');
-
-      final importData = {
-        'module_id': moduleId,
-        'user_id': user.id,
-        'imported_at': DateTime.now().toIso8601String(),
-        'download_count': 1,
-        'server_url':
-            module.serverUrl ??
-            'https://trainingserver.example.com', // JETZT FUNKTIONIERT DAS!
-      };
-
-      // DEBUG: Zeige was gesendet wird
-      print('📤 Wird gesendet:');
-      importData.forEach((key, value) {
-        print('   $key: $value (${value.runtimeType})');
-      });
-
-      // Prüfe ob versehentlich ein 'id' Feld existiert
-      if (importData.containsKey('id')) {
-        print(
-          '⚠️ WARNUNG: importData enthält ein "id" Feld! Das wird entfernt...',
-        );
-        importData.remove('id');
-      }
-
-      try {
-        final response = await _supabase
-            .from('imported_modules')
-            .insert(importData)
-            .select()
-            .single();
-
-        print('✅ Import-Eintrag erfolgreich erstellt: $response');
-      } catch (e) {
-        print('❌ FEHLER beim INSERT in imported_modules:');
-        print('   Error: $e');
-        print('   Error Type: ${e.runtimeType}');
-
-        // Teste direkt mit SQL
-        print('🔧 Teste mit SQL Query...');
-        try {
-          final testResult = await _supabase.rpc(
-            'debug_insert',
-            params: {
-              'p_module_id': moduleId,
-              'p_user_id': user.id,
-              'p_server_url':
-                  module.serverUrl ?? 'https://trainingserver.example.com',
-            },
-          );
-          print('SQL Test Result: $testResult');
-        } catch (sqlError) {
-          print('SQL Test auch fehlgeschlagen: $sqlError');
+        if (isCurrentlyDeleted) {
+          // Re-Import eines gelöschten Moduls
+          await _supabase
+              .from('imported_modules')
+              .update({
+                'is_deleted': false,
+                'deleted_at': null,
+                'download_count': currentCount + 1,
+                'imported_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', existingImport['id']);
+          print('✅ Gelöschtes Modul re-importiert');
+        } else {
+          // Download-Count erhöhen
+          await _supabase
+              .from('imported_modules')
+              .update({
+                'download_count': currentCount + 1,
+                'imported_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', existingImport['id']);
+          print('✅ Download-Count erhöht');
         }
-
-        rethrow;
       }
 
-      // await _supabase.from('imported_modules').insert(importData);
-      print(
-        '✅ Import-Eintrag erfolgreich erstellt mit server_url: ${importData['server_url']}',
-      );
-
-      // 4. Beispiel-Submodule nur für neue Module
-      if (isNewModule) {
-        print('📚 Füge Submodule hinzu...');
-        await _addSampleSubmodules(moduleId, module);
-      }
-
-      // 5. Status aktualisieren
-      final index = availableModules.indexWhere((m) => m.title == module.title);
-      if (index != -1) {
-        availableModules[index] = ImportableModule(
-          id: module.id,
-          title: module.title,
-          description: module.description,
-          icon: module.icon,
-          color: module.color,
-          isDefault: false,
-          isImported: true,
-          serverUrl: module.serverUrl,
-        );
-        print(
-          '🔄 UI-Status aktualisiert: ${module.title} ist jetzt importiert',
-        );
-      }
-
-      // 6. Module-Liste neu laden
+      // Module-Listen aktualisieren
+      await fetchImportableModules();
       await fetchModules();
 
-      // 7. Optional: Debug-Ausgabe
-      print('🎉 Import erfolgreich abgeschlossen!');
       return true;
     } catch (e) {
       error = 'Import fehlgeschlagen: $e';
-      print('❌ Fehler beim Import: $e');
-
-      // Detaillierte Fehleranalyse
-      if (e.toString().contains('server_url')) {
-        error = 'Datenbankfehler: Problem mit server_url Spalte. ';
-        print(
-          '⚠️ Bitte prüfe ob die server_url Spalte in imported_modules existiert',
-        );
-      }
-
+      print('❌ Import-Fehler: $e');
       return false;
     } finally {
       isLoading = false;
@@ -2563,67 +2501,11 @@ class BackendProvider with ChangeNotifier {
   // --- Simulation externer Server-Abfrage ---
   // Korrigierte _simulateExternalServerCall Methode:
   Future<List<Map<String, dynamic>>> _simulateExternalServerCall() async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    // Diese Methode wird nicht mehr benötigt, da wir direkt aus der DB laden
+    // Sie können sie entweder leer lassen oder ganz entfernen
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    return [
-      {
-        'id': 101,
-        'title': 'Advanced Mathematics',
-        'description':
-            'Master advanced mathematical concepts and problem-solving',
-        'icon': 'calculate',
-        'color': '#5E35B1',
-        'server_url': 'https://trainingserver.example.com/modules/math',
-      },
-      {
-        'id': 102,
-        'title': 'Physics', // ACHTUNG: Dies IST ein default Modul!
-        'description': 'Explore the fundamental principles of physics',
-        'icon': 'science',
-        'color': '#9C27B0',
-        'server_url': 'https://trainingserver.example.com/modules/physics',
-      },
-      {
-        'id': 103,
-        'title': 'Chemistry',
-        'description': 'Learn the core concepts of chemistry',
-        'icon': 'biotech',
-        'color': '#4CAF50',
-        'server_url': 'https://trainingserver.example.com/modules/chemistry',
-      },
-      {
-        'id': 104,
-        'title': 'Biology', // ACHTUNG: Dies IST ein default Modul!
-        'description': 'Understand the fundamentals of life',
-        'icon': 'psychology',
-        'color': '#2196F3',
-        'server_url': 'https://trainingserver.example.com/modules/biology',
-      },
-      {
-        'id': 105,
-        'title': 'Computer Science',
-        'description': 'Learn programming and algorithms',
-        'icon': 'computer',
-        'color': '#FF5722',
-        'server_url': 'https://trainingserver.example.com/modules/cs',
-      },
-      {
-        'id': 106,
-        'title': 'History',
-        'description': 'Explore world history and civilizations',
-        'icon': 'history_edu',
-        'color': '#795548',
-        'server_url': 'https://trainingserver.example.com/modules/history',
-      },
-      {
-        'id': 107,
-        'title': 'English', // ACHTUNG: Dies IST ein default Modul!
-        'description': 'Learn English language and literature',
-        'icon': 'menu_book',
-        'color': '#F44336',
-        'server_url': 'https://trainingserver.example.com/modules/english',
-      },
-    ];
+    return []; // Leere Liste zurückgeben, da wir aus DB laden
   }
 
   // Methode um zu prüfen, ob ein Modul importierbar ist (nicht default)
@@ -2767,17 +2649,31 @@ class BackendProvider with ChangeNotifier {
 
   // Prüft ob ein Modul für den User sichtbar ist (in imported_modules vorhanden)
   // Ersetze diese Methode:
+  // In BackendProvider - Ersetze isModuleAvailableToUser:
+
   Future<bool> isModuleAvailableToUser(int moduleId) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
 
-      // Prüfe ob der User dieses Modul ÜBERHAUPT sehen kann
-      // Das ist der Fall wenn:
-      // 1. Es ein Standard-Modul ist ODER
-      // 2. Es in imported_modules für diesen User existiert
+      // 1. Prüfe ob der User dieses Modul gelöscht hat
+      final deleted =
+          await _supabase
+                  .from('deleted_modules')
+                  .select('id')
+                  .eq('module_id', moduleId)
+                  .eq('user_id', user.id)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
 
-      // Zuerst: Ist es ein Standard-Modul?
+      if (deleted != null) {
+        print(
+          '⚠️ Modul $moduleId wurde von diesem User gelöscht - nicht verfügbar',
+        );
+        return false;
+      }
+
+      // 2. Hole Modul-Daten
       final module =
           await _supabase
                   .from('modules')
@@ -2786,12 +2682,12 @@ class BackendProvider with ChangeNotifier {
                   .maybeSingle()
               as Map<String, dynamic>?;
 
-      if (module == null) return false; // Modul existiert gar nicht
+      if (module == null) return false;
 
       final bool isDefault = (module['default'] as bool?) == true;
 
       if (isDefault) {
-        // Standard-Module sind immer verfügbar (können gesehen werden)
+        // Standard-Module sind verfügbar, solange nicht gelöscht
         return true;
       } else {
         // Nicht-Standard Module: Prüfe ob importiert
@@ -2830,198 +2726,64 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Löscht ein Modul (für den aktuellen User)
+  // In BackendProvider - Ersetze die bestehende deleteModule Methode vollständig:
+
   Future<bool> deleteModule(int moduleId, String moduleTitle) async {
     isLoading = true;
     notifyListeners();
 
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) {
-        print('❌ Kein User eingeloggt');
-        return false;
-      }
+      if (user == null) return false;
 
-      print('🗑️ Versuche Modul zu löschen: $moduleTitle (ID: $moduleId)');
+      print('🗑️ Lösche Modul: $moduleTitle');
 
-      // 1. Hole Modul-Daten um festzustellen ob es Standard ist
-      final moduleData =
-          await _supabase
-                  .from('modules')
-                  .select('default, title')
-                  .eq('id', moduleId)
-                  .maybeSingle()
-              as Map<String, dynamic>?;
-
-      if (moduleData == null) {
-        print('❌ Modul nicht gefunden');
-        error = 'Modul nicht gefunden';
-        return false;
-      }
-
-      final bool isDefault = (moduleData['default'] as bool?) == true;
-
-      // 2. In deleted_modules Tabelle protokollieren
-      print('📝 Logge Löschung in deleted_modules...');
-      await _supabase.from('deleted_modules').insert({
-        'module_id': moduleId,
-        'user_id': user.id,
-        'deleted_at': DateTime.now().toIso8601String(),
-      });
+      // Nur für importierte Module (nicht-Standard)
+      final isDefault = await isModuleDefault(moduleId);
 
       if (isDefault) {
-        // --- STANDARD MODUL ---
-        print('ℹ️ Modul ist ein Standard-Modul');
-
-        // Prüfe ob der User es importiert hat
-        final imported =
+        // Für Standard-Module: in deleted_modules protokollieren
+        await _supabase.from('deleted_modules').insert({
+          'module_id': moduleId,
+          'user_id': user.id,
+          'deleted_at': DateTime.now().toIso8601String(),
+        });
+        print('✅ Standard-Modul für User versteckt');
+      } else {
+        // Für importierte Module: Soft-Delete in imported_modules
+        final importEntry =
             await _supabase
                     .from('imported_modules')
                     .select('id')
-                    .eq('module_id', moduleId)
                     .eq('user_id', user.id)
+                    .eq('module_id', moduleId)
                     .maybeSingle()
                 as Map<String, dynamic>?;
 
-        if (imported != null) {
-          // Aus imported_modules entfernen (wenn vorhanden)
-          print('🗑️ Entferne aus imported_modules...');
+        if (importEntry != null) {
           await _supabase
               .from('imported_modules')
-              .delete()
-              .eq('module_id', moduleId)
-              .eq('user_id', user.id);
-        } else {
-          // Noch nie importiert: einfach nur in deleted_modules protokollieren
-          print('ℹ️ Modul wurde noch nie importiert, nur protokollieren');
-        }
-
-        print('✅ Standard-Modul für diesen User entfernt');
-      } else {
-        // --- IMPORTIERTES MODUL (nicht Standard) ---
-        print('ℹ️ Modul ist ein importiertes Modul');
-
-        // 3. Aus imported_modules entfernen (für diesen User)
-        print('🗑️ Entferne aus imported_modules...');
-        await _supabase
-            .from('imported_modules')
-            .delete()
-            .eq('module_id', moduleId)
-            .eq('user_id', user.id);
-
-        // 4. Prüfe ob es von anderen Usern verwendet wird
-        print('🔍 Prüfe ob Modul noch von anderen Usern verwendet wird...');
-        final otherUsers =
-            await _supabase
-                    .from('imported_modules')
-                    .select('id')
-                    .eq('module_id', moduleId)
-                    .neq('user_id', user.id)
-                as List<dynamic>;
-
-        if (otherUsers.isEmpty) {
-          print(
-            '🔴 Modul wird von keinem anderen User verwendet - lösche komplett...',
-          );
-
-          // Zuerst abhängige Daten löschen
-          await _deleteDependentData(moduleId);
-
-          // Dann das Modul selbst
-          await _supabase.from('modules').delete().eq('id', moduleId);
-
-          print('✅ Modul komplett aus der Datenbank gelöscht');
-        } else {
-          print(
-            'ℹ️ Modul wird noch von anderen Usern verwendet - nur für diesen User entfernt',
-          );
+              .update({
+                'is_deleted': true,
+                'deleted_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', importEntry['id']);
+          print('✅ Importiertes Modul soft-gelöscht');
         }
       }
 
-      // 5. Lokale Module-Liste aktualisieren
+      // Listen aktualisieren
       await fetchModules();
+      await fetchImportableModules();
 
-      print('✅ Modul erfolgreich entfernt: $moduleTitle');
       return true;
     } catch (e) {
-      error = 'Fehler beim Löschen des Moduls: $e';
-      print('❌ Fehler beim Löschen: $e');
+      error = 'Löschen fehlgeschlagen: $e';
+      print('❌ Lösch-Fehler: $e');
       return false;
     } finally {
       isLoading = false;
       notifyListeners();
-    }
-  }
-
-  // Hilfsmethode zum Löschen abhängiger Daten (nur für nicht-standard Module)
-  Future<void> _deleteDependentData(int moduleId) async {
-    try {
-      print('🗑️ Lösche abhängige Daten für Modul $moduleId...');
-
-      // 1. Alle Submodules dieses Moduls finden
-      final submodules =
-          await _supabase
-                  .from('submodules')
-                  .select('id')
-                  .eq('modules_id', moduleId)
-              as List<dynamic>;
-
-      final submoduleIds = submodules.map((s) => s['id']).toList();
-
-      if (submoduleIds.isNotEmpty) {
-        // 2. Alle Questions für diese Submodules finden
-        final questions =
-            await _supabase
-                    .from('questions')
-                    .select('id')
-                    .inFilter('submodule_id', submoduleIds)
-                as List<dynamic>;
-
-        final questionIds = questions.map((q) => q['id']).toList();
-
-        if (questionIds.isNotEmpty) {
-          // 3. Options für diese Questions löschen
-          await _supabase
-              .from('options')
-              .delete()
-              .inFilter('question_id', questionIds);
-
-          // 4. User card progress für diese Questions löschen
-          await _supabase
-              .from('user_card_progress')
-              .delete()
-              .inFilter('card_id', questionIds);
-
-          // 5. Questions löschen
-          await _supabase
-              .from('questions')
-              .delete()
-              .inFilter('id', questionIds);
-        }
-
-        // 6. User submodule level progress löschen
-        await _supabase
-            .from('user_submodule_level_progress')
-            .delete()
-            .inFilter('submodule_id', submoduleIds);
-
-        // 7. Submodules löschen
-        await _supabase.from('submodules').delete().eq('modules_id', moduleId);
-      }
-
-      // 8. Learning sessions für dieses Modul löschen
-      final submoduleIdsForSessions = submoduleIds.isNotEmpty
-          ? submoduleIds
-          : [0];
-      await _supabase
-          .from('learning_sessions')
-          .delete()
-          .inFilter('submodule_id', submoduleIdsForSessions);
-
-      print('✅ Abhängige Daten gelöscht');
-    } catch (e) {
-      print('⚠️ Fehler beim Löschen abhängiger Daten: $e');
-      // Wir fahren trotzdem fort
     }
   }
 }

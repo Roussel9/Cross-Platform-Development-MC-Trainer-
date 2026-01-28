@@ -21,12 +21,27 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BackendProvider>().fetchImportableModules();
     });
 
     // Listener für die Sucheingabe
     _searchController.addListener(_filterModules);
+
+    // WICHTIG: Listener für Provider-Änderungen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<BackendProvider>();
+
+      // Füge einen Listener hinzu, der auf Änderungen reagiert
+      provider.addListener(() {
+        if (mounted) {
+          // Aktualisiere die gefilterte Liste, wenn sich die availableModules ändern
+          _filterModules();
+          setState(() {});
+        }
+      });
+    });
   }
 
   @override
@@ -39,51 +54,53 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
     final provider = context.read<BackendProvider>();
     final searchText = _searchController.text.toLowerCase().trim();
 
-    setState(() {
-      if (searchText.isEmpty) {
-        _filteredModules = provider.availableModules;
-      } else {
-        // Erstelle eine Liste von Modulen mit Prioritäts-Scores
-        final List<Map<String, dynamic>> moduleScores = [];
+    if (mounted) {
+      setState(() {
+        if (searchText.isEmpty) {
+          _filteredModules = List.from(provider.availableModules);
+        } else {
+          // Erstelle eine Liste von Modulen mit Prioritäts-Scores
+          final List<Map<String, dynamic>> moduleScores = [];
 
-        for (var module in provider.availableModules) {
-          int score = 0;
-          final lowerTitle = module.title.toLowerCase();
-          final lowerDescription = module.description.toLowerCase();
+          for (var module in provider.availableModules) {
+            int score = 0;
+            final lowerTitle = module.title.toLowerCase();
+            final lowerDescription = module.description.toLowerCase();
 
-          // PRIORITÄT 1: Beginnt mit Suchtext (höchste Priorität)
-          if (lowerTitle.startsWith(searchText)) {
-            score = 100;
-          }
-          // PRIORITÄT 2: Enthält Suchtext im Titel (mittlere Priorität)
-          else if (lowerTitle.contains(searchText)) {
-            score = 50;
-          }
-          // PRIORITÄT 3: Enthält Suchtext in der Beschreibung (niedrigste Priorität)
-          else if (lowerDescription.contains(searchText)) {
-            score = 10;
+            // PRIORITÄT 1: Beginnt mit Suchtext (höchste Priorität)
+            if (lowerTitle.startsWith(searchText)) {
+              score = 100;
+            }
+            // PRIORITÄT 2: Enthält Suchtext im Titel (mittlere Priorität)
+            else if (lowerTitle.contains(searchText)) {
+              score = 50;
+            }
+            // PRIORITÄT 3: Enthält Suchtext in der Beschreibung (niedrigste Priorität)
+            else if (lowerDescription.contains(searchText)) {
+              score = 10;
+            }
+
+            if (score > 0) {
+              moduleScores.add({
+                'module': module,
+                'score': score,
+                'title': lowerTitle,
+              });
+            }
           }
 
-          if (score > 0) {
-            moduleScores.add({
-              'module': module,
-              'score': score,
-              'title': lowerTitle,
-            });
-          }
+          // Sortiere nach Score (absteigend), dann alphabetisch nach Titel
+          moduleScores.sort((a, b) {
+            if (a['score'] != b['score']) {
+              return (b['score'] as int).compareTo(a['score'] as int);
+            }
+            return (a['title'] as String).compareTo(b['title'] as String);
+          });
+
+          _filteredModules = moduleScores.map((item) => item['module'] as ImportableModule).toList();
         }
-
-        // Sortiere nach Score (absteigend), dann alphabetisch nach Titel
-        moduleScores.sort((a, b) {
-          if (a['score'] != b['score']) {
-            return (b['score'] as int).compareTo(a['score'] as int);
-          }
-          return (a['title'] as String).compareTo(b['title'] as String);
-        });
-
-        _filteredModules = moduleScores.map((item) => item['module'] as ImportableModule).toList();
-      }
-    });
+      });
+    }
   }
 
   Widget _buildSearchBar() {
@@ -270,23 +287,38 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
             ? const Icon(Icons.check, color: Colors.blue)
             : ElevatedButton(
           onPressed: () async {
+            // WICHTIG: Setze loading state
+            setState(() {});
+
             final success = await provider.importModule(module);
+
             if (success && mounted) {
+              // WICHTIG: Nach erfolgreichem Import, aktualisiere die Liste
+              await provider.fetchImportableModules();
+
+              // Aktualisiere die gefilterte Liste
+              _filterModules();
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('${module.title} wurde importiert!'),
                   backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 2),
                 ),
               );
-              // Nach erfolgreichem Import: Filter aktualisieren
-              _filterModules();
             } else if (!success && mounted && provider.error != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(provider.error!),
                   backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 3),
                 ),
               );
+            }
+
+            // WICHTIG: Setze state zurück
+            if (mounted) {
+              setState(() {});
             }
           },
           style: ElevatedButton.styleFrom(
@@ -296,7 +328,16 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: const Text('Importieren'),
+          child: provider.isLoading
+              ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          )
+              : const Text('Importieren'),
         ),
       ),
     );
