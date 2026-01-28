@@ -6,6 +6,7 @@ import 'package:mc_trainer_kami/core/constants/app_strings.dart';
 import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/models/lernen_module.dart';
+import 'package:mc_trainer_kami/models/statistics.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Avatar hochladen
@@ -43,6 +44,7 @@ class BackendProvider with ChangeNotifier {
   int modulesCompleted = 0;
 
   // Listen & Status
+  List<Statistics> userStatistics = [];
   List<LernenModule> allModules = []; // pour Modules page
   List<LernenModule> lastModules = [];
   Map<String, dynamic>? lastSession;
@@ -86,6 +88,8 @@ class BackendProvider with ChangeNotifier {
     fetchHomeData();
     fetchPoints();
     fetchNotifications();
+    fetchAchievementsData();
+    fetchUserStats();
 
     // Beobachte Auth-Status; beim Login/Logout ggf. Module nachladen
     try {
@@ -105,6 +109,36 @@ class BackendProvider with ChangeNotifier {
   void dispose() {
     _authSub?.cancel();
     super.dispose();
+  }
+
+  Future fetchUserStats() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final res =
+          await _supabase
+                  .from('learning_sessions')
+                  .select(
+                    'total_questions, correct_answered, incorrect_answered, iscompleted',
+                  )
+                  .eq('user_id', user.id)
+              as List<dynamic>;
+
+      if (res.isEmpty) return;
+
+      userStatistics = res.map((row) {
+        final data = row as Map<String, dynamic>;
+        return Statistics(
+          total_questions: data['total_questions'],
+          correct_answered: data['correct_answered'],
+          incorrect_answered: data['incorrect_answered'],
+          session_success: data['iscompleted'],
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('User Statistics Error: $e');
+    }
   }
 
   Future<void> addAchievementFirstVisit() async {
@@ -553,9 +587,7 @@ class BackendProvider with ChangeNotifier {
       questionsThisWeek = lastSession?['total_questions'] ?? 0;
       // Module aus user_statistics berechnen
       //modulesCompleted = 5; // TODO: aus Datenbank berechnen
-      currentStreak = 7; // TODO: aus Datenbank berechnen
-      // Dummy-Daten (müssen später durch echte Abfragen ersetzt werden)
-      currentStreak = 7;
+      currentStreak;
     } catch (e) {
       error = 'Daten konnten nicht geladen werden.$e';
       print('Fehler: $e');
@@ -563,8 +595,6 @@ class BackendProvider with ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
-    fetchAchievementsData();
-    fetchNotifications();
   }
 
   Future<void> fetchAchievementsData() async {

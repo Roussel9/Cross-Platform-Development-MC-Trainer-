@@ -321,9 +321,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildProfileHeader(provider, isSmallScreen),
                   SizedBox(height: isSmallScreen ? 16 : 24),
 
-                  _buildLearningStatsSection(provider, isSmallScreen),
-                  SizedBox(height: isSmallScreen ? 16 : 24),
-
                   _buildPersonalInfoSection(provider, isSmallScreen),
                   SizedBox(height: isSmallScreen ? 24 : 32),
 
@@ -545,75 +542,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontSize: isSmallScreen ? 10 : 12,
             color: Colors.white.withOpacity(0.8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLearningStatsSection(
-    BackendProvider provider,
-    bool isSmallScreen,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(
-            left: isSmallScreen ? 4.0 : 8.0,
-            bottom: isSmallScreen ? 8 : 12,
-          ),
-          child: Text(
-            'Lernstatistiken',
-            style: TextStyle(
-              fontSize: isSmallScreen ? 16 : 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryColorDark,
-            ),
-          ),
-        ),
-        Container(
-          padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Gelernte Stunden
-              _buildStatRow(
-                icon: Icons.timer_outlined,
-                label: 'Gelernte Stunden',
-                value: '${provider.learnedHours}h',
-                valueColor: Colors.green,
-                isSmallScreen: isSmallScreen,
-              ),
-              SizedBox(height: isSmallScreen ? 12 : 16),
-
-              _buildStatRow(
-                icon: Icons.bar_chart_outlined,
-                label: 'Durchschnittliche Punktzahl',
-                value: '${provider.averageScore.toStringAsFixed(1)}%',
-                valueColor: AppColors.primaryColorLight,
-                isSmallScreen: isSmallScreen,
-              ),
-              SizedBox(height: isSmallScreen ? 12 : 16),
-
-              _buildStatRow(
-                icon: Icons.check_circle_outline,
-                label: 'Module abgeschlossen',
-                value: '${provider.modulesCompleted}/12',
-                valueColor: Colors.orange,
-                isSmallScreen: isSmallScreen,
-              ),
-            ],
           ),
         ),
       ],
