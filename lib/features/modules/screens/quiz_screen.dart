@@ -1,22 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:async'; // NEU: Für Timer
-// Stellen Sie sicher, dass diese Imports zu Ihren tatsächlichen Dateien passen
+import 'dart:async'; 
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
 import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
 
-// =========================================================
-// DATEN MODELLE (Wiederholt zur Vollständigkeit, falls benötigt)
-// =========================================================
-
-// Hier würden Ihre tatsächlichen Model-Klassen Option, Question, Lesson, Module stehen,
-// importiert aus 'package:mc_trainer_kami/models/module_data.dart'.
-// Da Sie diese importiert haben, lasse ich sie hier weg, um Doppeldefinitionen zu vermeiden.
-
-// =========================================================
-// HILFSFUNKTION FÜR KORREKTEN INDEX
-// =========================================================
 
 List<int> _getCorrectIndices(List<Option> options) {
   final correctIndices = <int>[];
@@ -28,18 +16,13 @@ List<int> _getCorrectIndices(List<Option> options) {
   return correctIndices;
 }
 
-// NEU: Format Sekunden zu MM:SS
+
 String _formatTime(int seconds) {
   final minutes = seconds ~/ 60;
   final secs = seconds % 60;
   return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
 }
 
-// =========================================================
-// WIEDERVERWENDBARE WIDGETS
-// =========================================================
-
-// 1. Option Card (Für den aktiven Quiz-Modus)
 class OptionCard extends StatelessWidget {
   final Option option;
   final bool isSelected;
@@ -279,9 +262,9 @@ class ReviewOptionCard extends StatelessWidget {
   }
 }
 
-// 4. Quiz Result Overlay (Popup nach Abschluss des Quiz) - Overflow-Fix für extreme Breiten
+
 class QuizResultOverlay extends StatelessWidget {
-  // ... [Konstruktor und Variablen bleiben unverändert] ...
+
 
   final int correctAnswers;
   final int totalQuestions;
@@ -303,7 +286,7 @@ class QuizResultOverlay extends StatelessWidget {
   });
 
   Widget _buildStatPill(String label, dynamic value, Color color) {
-    // ... [Implementierung unverändert] ...
+    
     return Column(
       children: [
         Row(
@@ -352,17 +335,12 @@ class QuizResultOverlay extends StatelessWidget {
 
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // Fix 1: Begrenzt die Karte nicht nach unten, wenn der Bildschirm extrem schmal ist.
-    // Die Card nimmt 90% der Breite auf kleinen Bildschirmen ein, maximal 500px.
     final maxCardWidth = screenWidth < 600 ? screenWidth * 0.9 : 500.0;
 
     const double buttonMaxWidth = 160.0;
     const EdgeInsets buttonPadding = EdgeInsets.symmetric(vertical: 10);
 
-    // Fix 2: Erhöhe den Schwellenwert für Full-Width-Buttons, um sicherzustellen,
-    // dass sie sofort untereinander springen und den Overflow verhindern.
-    // Setze isSmallScreen auf 500px, um sicherzugehen.
-    final bool isSmallScreen = screenWidth < 500;
+     final bool isSmallScreen = screenWidth < 500;
 
     return Center(
       child: ConstrainedBox(
@@ -370,16 +348,16 @@ class QuizResultOverlay extends StatelessWidget {
         child: Material(
           type: MaterialType.transparency,
           child: Card(
-            margin: const EdgeInsets.all(10), // Hier sind 20px Margin
+            margin: const EdgeInsets.all(10), 
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(20.0), // Hier sind 30px Padding
+              padding: const EdgeInsets.all(20.0), 
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ... [Titel, Status, Ergebnis, Statistiken unverändert] ...
+                 
                   Icon(
                     passed ? Icons.check_circle_outline : Icons.cancel_outlined,
                     color: passed ? Colors.green : Colors.red,
@@ -429,15 +407,15 @@ class QuizResultOverlay extends StatelessWidget {
                   ),
                   const SizedBox(height: 30),
 
-                  // Aktionen (Müssen bei isSmallScreen Full-Width sein)
+                 
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
                     alignment: WrapAlignment.center,
                     children: [
-                      // Review Answers Button
+                    
                       SizedBox(
-                        // Sollte bei isSmallScreen Full-Width sein
+                        
                         width: isSmallScreen ? double.infinity : buttonMaxWidth,
                         child: OutlinedButton.icon(
                           onPressed: onReviewAnswers,
@@ -451,7 +429,7 @@ class QuizResultOverlay extends StatelessWidget {
                         ),
                       ),
 
-                      // Retry Lesson Button
+                      
                       SizedBox(
                         width: isSmallScreen ? double.infinity : buttonMaxWidth,
                         child: OutlinedButton.icon(
@@ -466,7 +444,6 @@ class QuizResultOverlay extends StatelessWidget {
                         ),
                       ),
 
-                      // Back to Module Button
                       SizedBox(
                         width: isSmallScreen ? double.infinity : buttonMaxWidth,
                         child: ElevatedButton.icon(
@@ -495,14 +472,11 @@ class QuizResultOverlay extends StatelessWidget {
   }
 }
 
-// =========================================================
-// HAUPT-SCREEN (QUIZSCREEN)
-// =========================================================
 
 class QuizScreen extends StatefulWidget {
   final Module module;
   final Lesson lesson;
-  final dynamic submoduleId; // NEU: für Session-Tracking
+  final dynamic submoduleId; 
 
   const QuizScreen({
     super.key,
@@ -522,12 +496,13 @@ class _QuizScreenState extends State<QuizScreen> {
 
   bool _quizFinished = false;
   bool _isReviewMode = false;
-  bool _answerSubmitted = false; // NEU: Benutzer hat Antwort eingegeben
+  bool _answerSubmitted = false; 
   int _correctAnswers = 0;
-  String? _sessionId; // NEU: für Session-Tracking
-  bool _answerConfirmed = false; // NEU: Nutzer hat OK geklickt
+  String? _sessionId; //  Session-Tracking
+  bool _answerConfirmed = false; 
+  final Set<int> _confirmedQuestionIndices = {}; // bereits bestätigte Fragen
 
-  // NEU: Timer für Quiz
+  //  Timer für Quiz
   late Timer _quizTimer;
   int _elapsedSeconds = 0; // Verstrichene Sekunden
 
@@ -539,19 +514,21 @@ class _QuizScreenState extends State<QuizScreen> {
     _questions = widget.lesson.quizQuestions.map((q) {
       final correctIndices = _getCorrectIndices(q.options);
       return Question(
-        id: q.id, // ✅ WICHTIG: ID mitkopieren!
+        id: q.id, 
         questionText: q.questionText,
         options: q.options,
-        selectedOptionIndices: null, // Starten ohne Auswahl
+        selectedOptionIndices: null, 
         correctOptionIndices: correctIndices,
         explanation: q.explanation,
       );
     }).toList();
 
-    // NEU: Starte Learning Session in Supabase
+    _confirmedQuestionIndices.clear();
+
+    
     _startSession();
 
-    // NEU: Starte Timer
+    
     _startQuizTimer();
   }
 
@@ -581,7 +558,7 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _quizTimer.cancel(); // NEU: Stoppe Timer beim Dispose
+    _quizTimer.cancel(); 
 
     super.dispose();
   }
@@ -601,11 +578,11 @@ class _QuizScreenState extends State<QuizScreen> {
       return false;
     }
 
-    // Sortiere beide Listen für vergleich
+    
     final selectedSorted = question.selectedOptionIndices!..sort();
     final correctSorted = question.correctOptionIndices..sort();
 
-    // Vergleiche ob alle Auswahlpunkte gleich sind
+    
     if (selectedSorted.length != correctSorted.length) {
       return false;
     }
@@ -620,36 +597,43 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _selectOption(int optionIndex) {
-    if (!_isReviewMode && !_answerSubmitted) {
+    final isConfirmed = _confirmedQuestionIndices.contains(
+      _currentQuestionIndex,
+    );
+    if (!_isReviewMode && !_answerSubmitted && !isConfirmed) {
       setState(() {
         final currentQuestion = _questions[_currentQuestionIndex];
         final currentSelected = currentQuestion.selectedOptionIndices ?? [];
 
         if (currentSelected.contains(optionIndex)) {
-          // Deselektiere wenn bereits ausgewählt
+          
           currentSelected.removeWhere((index) => index == optionIndex);
         } else {
-          // Selektiere wenn nicht ausgewählt
+          
           currentSelected.add(optionIndex);
         }
 
         _questions[_currentQuestionIndex].selectedOptionIndices =
             currentSelected.isEmpty ? null : currentSelected;
-        _answerConfirmed = false; // Zurücksetzen: Nutzer kann noch ändern
+        _answerConfirmed = false; 
       });
     }
   }
 
   void _confirmAnswer() {
     final currentQuestion = _questions[_currentQuestionIndex];
+    if (_confirmedQuestionIndices.contains(_currentQuestionIndex)) {
+      return; 
+    }
     if (!_isReviewMode &&
         !_answerSubmitted &&
         currentQuestion.selectedOptionIndices != null &&
         currentQuestion.selectedOptionIndices!.isNotEmpty) {
       final isCorrect = _isAnswerCorrect(currentQuestion);
       setState(() {
-        _answerSubmitted = true; // Zeige Feedback
-        _answerConfirmed = true; // Markiere als bestätigt
+        _answerSubmitted = true; 
+        _answerConfirmed = true; 
+        _confirmedQuestionIndices.add(_currentQuestionIndex);
         if (isCorrect) {
           _correctAnswers++;
         }
@@ -664,7 +648,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final question = _questions[_currentQuestionIndex];
       final isCorrect = _isAnswerCorrect(question);
 
-      // NEU: Speichere Antwort mit Question ID (als String)
+      
       await provider.recordAnswer(
         question.id?.toString() ?? 'unknown',
         isCorrect,
@@ -678,8 +662,9 @@ class _QuizScreenState extends State<QuizScreen> {
     if (index >= 0 && index < _questions.length) {
       setState(() {
         _currentQuestionIndex = index;
-        _answerSubmitted = false; // Zurücksetzen für neue Frage
-        _answerConfirmed = false; // Zurücksetzen Bestätigung
+        final isConfirmed = _confirmedQuestionIndices.contains(index);
+        _answerSubmitted = isConfirmed; 
+        _answerConfirmed = isConfirmed; 
       });
       _scrollController.animateTo(
         0,
@@ -704,7 +689,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Future<void> _finishSessionAndShowResults() async {
     try {
-      _quizTimer.cancel(); // NEU: Stoppe Timer
+      _quizTimer.cancel(); // Stoppe Timer
       debugPrint('🎬 Starting session finish sequence...');
       await _finishSession();
       debugPrint('✅ Session finished successfully');
@@ -720,7 +705,7 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_sessionId == null || widget.submoduleId == null) return;
     try {
       final provider = Provider.of<BackendProvider>(context, listen: false);
-      final durationMinutes = _elapsedSeconds ~/ 60; // Konvertiere zu Minuten
+      final durationMinutes = _elapsedSeconds ~/ 60; // zu Minuten
 
       debugPrint(
         '⏱️ Quiz beendet: $_elapsedSeconds Sekunden = $durationMinutes Minuten',
@@ -731,11 +716,11 @@ class _QuizScreenState extends State<QuizScreen> {
         _sessionId!,
         total: _questions.length,
         correct: _correctAnswers,
-        submoduleId: widget.submoduleId, // NEU: Übergebe Submodule ID
-        durationMinutes: durationMinutes, // NEU: Sende die Zeit
+        submoduleId: widget.submoduleId, // Übergabe Submodule ID
+        durationMinutes: durationMinutes, // die Zeit
       );
 
-      // NEU: Aktualisiere Fortschritte nach dem Beenden der Session
+      // Aktualisiere Fortschritte nach dem Beenden der Session
       debugPrint('🔄 Aktualisiere Fortschritte nach Quiz-Session...');
       await provider.updateSubmoduleProgress(widget.submoduleId);
       if (widget.module.id != null) {
@@ -791,12 +776,13 @@ class _QuizScreenState extends State<QuizScreen> {
       _correctAnswers = 0;
       _answerSubmitted = false;
       _answerConfirmed = false;
-      _elapsedSeconds = 0; // NEU: Reset Timer
+      _confirmedQuestionIndices.clear();
+      _elapsedSeconds = 0; // Reset Timer
 
       _questions = filteredQuestions.map((q) {
         final correctIndices = _getCorrectIndices(q.options);
         return Question(
-          id: q.id, // ✅ WICHTIG: ID mitkopieren!
+          id: q.id, // ID mitkopieren
           questionText: q.questionText,
           options: q.options,
           selectedOptionIndices: null,
@@ -807,11 +793,17 @@ class _QuizScreenState extends State<QuizScreen> {
       _scrollController.jumpTo(0);
     });
     _startSession(); // Neue Session starten
-    _startQuizTimer(); // NEU: Starte Timer neu
+    _startQuizTimer(); // Starten Timer neu
   }
 
   Future<void> _backToModule() async {
     final provider = Provider.of<BackendProvider>(context, listen: false);
+    if (widget.submoduleId != null) {
+      await provider.updateSubmoduleProgress(widget.submoduleId);
+    }
+    if (widget.module.id != null) {
+      await provider.updateModuleProgress(widget.module.id);
+    }
     await provider.refreshAllProgress();
     if (mounted) {
       Navigator.pop(context);
@@ -1135,7 +1127,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                         ?.contains(optionIndex) ??
                                     false;
 
-                                // NEU: Im Quiz-Modus nach Auswahl oder Review-Modus
+                                //  Im Quiz-Modus nach Auswahl oder Review-Modus
                                 if (_answerSubmitted || _isReviewMode) {
                                   return ReviewOptionCard(
                                     option: option,
@@ -1151,7 +1143,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 }
                               }).toList(),
 
-                              // NEU: Feedback nach Antwort
+                              //  Feedback nach Antwort
                               if (_answerSubmitted && !_isReviewMode)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 20),
@@ -1241,7 +1233,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                       ),
 
-                      // --- BOTTOM NAVIGATION BAR ---
+                      // BOTTOM NAVIGATION BAR 
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
@@ -1260,7 +1252,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                         child: Column(
                           children: [
-                            // 1. Pips / Question Stepper
+                            // 1.  Question Stepper
                             Padding(
                               padding: const EdgeInsets.only(bottom: 15.0),
                               child: QuestionStepper(
@@ -1304,7 +1296,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                 ),
 
-                                // OK Button (Mitte) - nur wenn Antwort ausgewählt aber noch nicht bestätigt
+                                // OK Button (Mitte)  nur wenn Antwort ausgewählt aber noch nicht bestätigt
                                 if (!_isReviewMode &&
                                     !_answerSubmitted &&
                                     currentQuestion.selectedOptionIndices !=
@@ -1346,7 +1338,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     onPressed:
                                         (_answerSubmitted || _isReviewMode)
                                         ? _goToNextQuestion
-                                        : null, // NEU: Disabled bis Antwort bestätigt
+                                        : null, //  Disabled bis Antwort bestätigt
                                     icon: Icon(
                                       _currentQuestionIndex ==
                                               totalQuestions - 1
@@ -1416,7 +1408,7 @@ class _QuizScreenState extends State<QuizScreen> {
             ),
           ),
 
-          // 3. ERGEBNIS-POPUP (Overlay) - VERWENDET DAS MOBILE-OPTIMIERTE WIDGET
+          // 3. ERGEBNIS-POPUP  
           if (_quizFinished)
             Container(
               color: Colors.black.withOpacity(0.6),

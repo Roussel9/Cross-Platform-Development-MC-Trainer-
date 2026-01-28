@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
+import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
 
 class AppBarActions extends StatelessWidget {
   final Color iconColor;
@@ -84,17 +85,28 @@ class AppBarActions extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.only(right: 16.0),
-              child: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                radius: 15,
-                child: Text(
-                  provider.userInitials.isNotEmpty
-                      ? provider.userInitials
-                      : 'JD',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileScreen(),
+                    ),
+                  );
+                },
+                child: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  radius: 15,
+                  child: Text(
+                    provider.userInitials.isNotEmpty
+                        ? provider.userInitials
+                        : 'JD',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ),

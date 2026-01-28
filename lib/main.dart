@@ -12,6 +12,8 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/services/auth_service.dart';
 import 'provider/backend_provider.dart' hide HomeScreen;
 import 'features/modules/screens/import_modules_screen.dart';
+import 'features/modules/screens/lesson_list_screen.dart';
+import 'models/module_data.dart';
 
 // --- Supabase Verbindung im Hintergrund testen ---
 void _testConnectionInBackground() async {
@@ -62,12 +64,31 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       initialRoute: user == null ? '/login' : '/home',
+      onGenerateRoute: (settings) {
+        if (settings.name == '/submodules') {
+          final module = settings.arguments;
+          if (module is Module) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => LessonListScreen(module: module),
+            );
+          }
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => const Scaffold(
+              body: Center(child: Text('Invalid module')),
+            ),
+          );
+        }
+        return null;
+      },
       routes: {
         '/': (context) => const AuthWrapper(),
         '/register': (context) => const RegisterScreen(),
         '/login': (context) => const LoginScreen(),
         //'/forgot-password': (context) => const ForgotPasswordScreen(),
         '/home': (context) => const HomeScreen(),
+        '/modules': (context) => const ModuleListScreen(),
         '/import-modules': (context) => const ImportModulesScreen(),
         // '/achievements': (context) => const AchievementsScreen(),
         // '/quiz': (context) => const QuizScreen(),

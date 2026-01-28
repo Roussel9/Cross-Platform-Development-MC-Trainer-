@@ -3,15 +3,15 @@ import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/widgets/custom_button.dart';
 
 class QuizCard extends StatelessWidget {
-  final String moduleTitle;
-  final String moduleDescription;
+  final String title;
+  final String subtitle;
   final double progress;
   final VoidCallback onResume;
 
   const QuizCard({
     super.key,
-    required this.moduleTitle,
-    required this.moduleDescription,
+    required this.title,
+    required this.subtitle,
     required this.progress,
     required this.onResume,
   });
@@ -52,14 +52,14 @@ class QuizCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        moduleTitle,
+                        title,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        moduleDescription,
+                        subtitle,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,

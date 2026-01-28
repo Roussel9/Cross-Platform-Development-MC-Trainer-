@@ -8,7 +8,7 @@ class AppStrings {
 
   // Home Screen
   static const String homeWelcome = 'Welcome back, John Doe! 👋';
-  static const String homeQuote = 'Education is the passport to the future!';
-  static const String continueLearning = 'Continue Where You Left Off';
-  static const String quickActions = 'Quick Actions';
+  static const String homeQuote = 'Bildung ist der Pass für die Zukunft!';
+  static const String continueLearning = 'Mach dort weiter, wo du aufgehört hast';
+  static const String quickActions = 'Schnellaktionen';
 }

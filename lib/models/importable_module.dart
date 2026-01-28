@@ -1,4 +1,4 @@
-// In models/importable_module.dart - vollständiges Model:
+
 
 class ImportableModule {
   final int id;
@@ -8,7 +8,7 @@ class ImportableModule {
   final String color;
   final bool isDefault;
   final bool isImported;
-  final bool isDeleted; // NEU
+  final bool isDeleted;
   final String? serverUrl;
 
   ImportableModule({
@@ -23,7 +23,7 @@ class ImportableModule {
     this.serverUrl,
   });
 
-  // WICHTIG: CopyWith Methode hinzufügen
+ 
   ImportableModule copyWith({
     int? id,
     String? title,

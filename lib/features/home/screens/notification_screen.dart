@@ -17,7 +17,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   void initState() {
     super.initState();
-    // Dein Provider-Aufruf nach dem ersten Frame
+    //  Provider-Aufruf nach dem ersten Frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BackendProvider>().fetchHomeData();
     });
@@ -72,14 +72,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Row(
               children: [
-                // MASTER: Liste
+                //  Liste
                 Expanded(
                   flex: isSplitView ? 2 : 1,
                   child: backend.notifications.isEmpty
                       ? const Center(child: Text('Keine Nachrichten'))
                       : _buildList(backend.notifications, isSplitView),
                 ),
-                // DETAIL: Mailbox-Ansicht
+                //  Mailbox-Ansicht
                 if (isSplitView)
                   Expanded(
                     flex: 3,
@@ -106,7 +106,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         final isSelected = _selectedNotification == note;
 
         return Dismissible(
-          key: Key('${note.id}'), // Sicherer Key-Fix
+          key: Key('${note.id}'),
           direction: DismissDirection.endToStart,
           background: Container(
             color: Colors.redAccent,

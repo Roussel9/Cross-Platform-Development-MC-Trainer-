@@ -128,7 +128,7 @@ class LessonCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${lesson.questions} questions',
+                            '${lesson.questions} Fragen',
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 13,
@@ -199,7 +199,7 @@ class LessonCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Completed',
+                  'Abgeschlossen',
                   style: TextStyle(
                     color: Colors.green.shade600,
                     fontSize: 10,
@@ -359,7 +359,7 @@ Widget _buildSubmoduleCard(
                       );
                     }
 
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => QuizScreen(
@@ -374,6 +374,12 @@ Widget _buildSubmoduleCard(
                         ),
                       ),
                     );
+                    if (!context.mounted) return;
+                    await provider.updateSubmoduleProgress(subId);
+                    if (module.id != null) {
+                      await provider.updateModuleProgress(module.id);
+                    }
+                    await provider.refreshAllProgress();
                   },
           );
         },
@@ -384,8 +390,15 @@ Widget _buildSubmoduleCard(
 
 class LessonListScreen extends StatefulWidget {
   final Module module;
+  final int? resumeSubmoduleId;
+  final bool resumeAutoStart;
 
-  const LessonListScreen({super.key, required this.module});
+  const LessonListScreen({
+    super.key,
+    required this.module,
+    this.resumeSubmoduleId,
+    this.resumeAutoStart = false,
+  });
 
   @override
   State<LessonListScreen> createState() => _LessonListScreenState();
@@ -393,6 +406,127 @@ class LessonListScreen extends StatefulWidget {
 
 class _LessonListScreenState extends State<LessonListScreen> {
   String _query = '';
+  bool _resumeHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.resumeAutoStart && widget.resumeSubmoduleId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_resumeHandled) {
+          _resumeHandled = true;
+          _openResumeSubmodule(widget.resumeSubmoduleId!);
+        }
+      });
+    }
+  }
+
+  Future<void> _openResumeSubmodule(int subId) async {
+    final provider = Provider.of<BackendProvider>(context, listen: false);
+
+    if (widget.module.id == null) return;
+
+    final submodules = await provider.fetchSubmodules(widget.module.id!);
+    final sub = submodules.firstWhere(
+      (s) => s['id'] == subId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (sub.isEmpty) return;
+
+    final questionsData = await provider.fetchAllQuestionsForSubmodule(subId);
+    if (questionsData.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Keine Fragen in diesem Submodul.')),
+      );
+      return;
+    }
+
+    final questionIds = questionsData.map((q) => q['id']).toList();
+    final optionsMap = await provider.fetchOptionsForQuestions(questionIds);
+
+    final List<Question> quizQuestions = [];
+    for (var q in questionsData) {
+      final qId = q['id'];
+      final opts = optionsMap[qId] ?? [];
+
+      final options = opts
+          .map(
+            (o) => Option(
+              text: o['text']?.toString() ?? '',
+              label: o['label']?.toString() ?? '',
+              isCorrect: (o['is_correct'] == true),
+            ),
+          )
+          .toList();
+
+      List<int> correctIndex = [];
+      for (int i = 0; i < options.length; i++) {
+        if (options[i].isCorrect) {
+          correctIndex.add(i);
+          break;
+        }
+      }
+
+      quizQuestions.add(
+        Question(
+          id: qId,
+          questionText:
+              q['questionText']?.toString() ??
+              q['question_text']?.toString() ??
+              '',
+          options: options,
+          correctOptionIndices: correctIndex,
+          explanation: q['explanation']?.toString(),
+        ),
+      );
+    }
+
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizScreen(
+          module: widget.module,
+          lesson: Lesson(
+            title: sub['title']?.toString() ?? 'Untitled',
+            duration: '${sub['estimate_duration'] ?? '-'} min',
+            questions: quizQuestions.length,
+            quizQuestions: quizQuestions,
+          ),
+          submoduleId: subId,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    await provider.refreshAllProgress();
+  }
+
+  bool _matchesSubmoduleQuery(Map<String, dynamic> sub, String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return true;
+
+    final title = (sub['title']?.toString() ?? '').toLowerCase();
+    final desc = (sub['description']?.toString() ?? '').toLowerCase();
+
+    final titleWords = title.split(RegExp(r'\s+'));
+    final descWords = desc.split(RegExp(r'\s+'));
+
+    // 1) Titel-Präfixe bevorzugen
+    if (titleWords.any((w) => w.startsWith(q))) return true;
+
+    // 2) Titel-Teiltreffer nur bei längerer Eingabe
+    if (q.length >= 3 && title.contains(q)) return true;
+
+    // 3) Beschreibung nur bei längerer Eingabe und Wort-Präfix
+    if (q.length >= 4 && descWords.any((w) => w.startsWith(q))) return true;
+
+    return false;
+  }
   final Set<int> _selectedSubmoduleIds = {};
   final Map<int, String> _submoduleTitles = {};
 
@@ -488,7 +622,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                     IconButton(
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _deleteSelectedSubmodules(
-                        Provider.of<BackendProvider>(context, listen: false),
+                         Provider.of<BackendProvider>(context, listen: false),
                       ),
                     ),
                     IconButton(
@@ -553,7 +687,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '$completedCount/$totalCount Submodules Completed',
+                                      '$completedCount/$totalCount Abgeschlossene Submodule',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
@@ -655,12 +789,11 @@ class _LessonListScreenState extends State<LessonListScreen> {
                             final subs = snapshot.data ?? [];
                             final filteredSubs = _query.isEmpty
                                 ? subs
-                                : subs.where((s) {
-                                    final title = (s['title']?.toString() ?? '')
-                                        .toLowerCase();
-                                    final q = _query.toLowerCase();
-                                    return title.contains(q);
-                                  }).toList();
+                                : subs
+                                    .where(
+                                      (s) => _matchesSubmoduleQuery(s, _query),
+                                    )
+                                    .toList();
 
                             for (final s in filteredSubs) {
                               final id = s['id'];
@@ -720,13 +853,16 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                       // Prüfe ob vorheriges Submodule completed ist
                                       final previousSubId =
                                           subs[originalIndex - 1]['id'];
-                                      return FutureBuilder<bool>(
-                                        future: provider.isSubmoduleCompleted(
+                                      return FutureBuilder<double>(
+                                        future: provider
+                                            .calculateSubmoduleProgress(
                                           previousSubId,
                                         ),
                                         builder: (context, prevSnapshot) {
-                                          final isPrevCompleted =
-                                              prevSnapshot.data ?? false;
+                                          final prevProgress =
+                                              prevSnapshot.data ?? 0.0;
+                                          final isPrevUnlocked =
+                                              prevProgress >= 0.8;
                                           return _buildSubmoduleCard(
                                             context,
                                             provider,
@@ -735,8 +871,8 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                             widget.module,
                                             isCompleted,
                                             isLocked:
-                                                !(isPrevCompleted ||
-                                                    isCompleted), // Locked wenn vorheriges nicht fertig
+                                                !(isPrevUnlocked ||
+                                                    isCompleted), // Locked wenn vorheriges < 80%
                                             selectionMode: _selectionMode,
                                             isSelected:
                                                 subId is int &&
@@ -756,6 +892,41 @@ class _LessonListScreenState extends State<LessonListScreen> {
                               }).toList(),
                             );
                           },
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.shade100,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: Colors.blue.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Du brauchst mindestens 80% Fortschritt, um das nächste Submodul freizuschalten. Viel Erfolg beim Lernen😇',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

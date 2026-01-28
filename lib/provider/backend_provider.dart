@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart'; // Fügt kDebugMode hinzu
+import 'package:flutter/foundation.dart'; 
 import 'package:flutter/material.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/constants/app_strings.dart';
@@ -9,7 +9,7 @@ import 'package:mc_trainer_kami/models/lernen_module.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Avatar hochladen
-import 'package:flutter/foundation.dart'; // Für kIsWeb
+import 'package:flutter/foundation.dart'; 
 import 'package:mc_trainer_kami/models/achievement_data.dart';
 import 'dart:async';
 
@@ -17,12 +17,28 @@ import '../models/app_notifications.dart';
 
 import 'package:mc_trainer_kami/models/importable_module.dart';
 
-// Extension zur Großschreibung von Strings
+class ResumeTarget {
+  final int moduleId;
+  final int submoduleId;
+  final String moduleTitle;
+  final String moduleDescription;
+  final String submoduleTitle;
+
+  ResumeTarget({
+    required this.moduleId,
+    required this.submoduleId,
+    required this.moduleTitle,
+    required this.moduleDescription,
+    required this.submoduleTitle,
+  });
+}
+
+
 extension StringCasingExtension on String {
   String capitalize() => '${this[0].toUpperCase()}${substring(1)}';
 }
 
-// --- Backend Provider ---
+
 class BackendProvider with ChangeNotifier {
   final _supabase = Supabase.instance.client;
   StreamSubscription<dynamic>? _authSub;
@@ -43,19 +59,20 @@ class BackendProvider with ChangeNotifier {
   int modulesCompleted = 0;
 
   // Listen & Status
-  List<LernenModule> allModules = []; // pour Modules page
+  List<LernenModule> allModules = []; 
   List<LernenModule> lastModules = [];
   Map<String, dynamic>? lastSession;
   List<Achievement> myAchievements = [];
   List<AppNotification> notifications = [];
-  // NEU: Profil Daten
+  //  Profil Daten
   String profileName = '';
   String profileEmail = '';
   String profileUsername = '';
   String? profileAvatarUrl;
   String profileCreatedAt = ''; // Mitglied seit Datum
-  // NEU: Profil Statistiken
+  // Profil Statistiken
   int learnedHours = 0;
+  int learnedMinutes = 0;
   double averageScore = 0.0;
   int totalQuestions = 0;
 
@@ -119,12 +136,12 @@ class BackendProvider with ChangeNotifier {
   ];
   // Konstruktor lädt direkt die Home-Daten
   BackendProvider() {
-    // Lade initiale Home-Daten (falls möglich)
+    //  initiale Home-Daten laden
     fetchHomeData();
     fetchPoints();
     fetchNotifications();
 
-    // Beobachte Auth-Status; beim Login/Logout ggf. Module nachladen
+    //  Auth-Status; beim Login/Logout ggf. Module nachladen
     try {
       _authSub = _supabase.auth.onAuthStateChange.listen((data) {
         debugPrint('Auth state changed: $data');
@@ -133,7 +150,7 @@ class BackendProvider with ChangeNotifier {
         fetchNotifications();
       });
     } catch (e) {
-      // manche Supabase-Versionen haben andere Signaturen; nur debug
+     
       debugPrint('Auth listener nicht registriert: $e');
     }
   }
@@ -145,13 +162,31 @@ class BackendProvider with ChangeNotifier {
   }
 
   Future<void> addAchievementFirstVisit() async {
-    final res = addAchievement(1);
-    if (await res) {
-      addNotification(
-        'New Gift',
-        'Congratulation: you won a new Price <First Visit>; You also upgraded your score',
-      );
-      fetchAchievementsData();
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final sessions =
+          await _supabase
+                  .from('learning_sessions')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .eq('iscompleted', true)
+                  .limit(1)
+              as List<dynamic>;
+
+      if (sessions.isEmpty) return;
+
+      final res = addAchievement(1);
+      if (await res) {
+        addNotification(
+          'New Gift',
+          'Congratulation: you won a new Price <First Visit>; You also upgraded your score',
+        );
+        fetchAchievementsData();
+      }
+    } catch (e) {
+      debugPrint('addAchievementFirstVisit error: $e');
     }
   }
 
@@ -227,6 +262,7 @@ class BackendProvider with ChangeNotifier {
           'achievement_id': achievementId,
         });
       }
+      await fetchPoints();
       await fetchNotifications();
     } catch (e) {
       debugPrint('addNotification error: $e');
@@ -374,7 +410,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Berechnung des Fortschritts einer Session
+  
   double calculateProgress(Map<String, dynamic>? session) {
     if (session == null) return 0.0;
     final total = session['total_questions'] ?? 1;
@@ -382,7 +418,7 @@ class BackendProvider with ChangeNotifier {
     return (correct / (total == 0 ? 1 : total)).clamp(0.0, 1.0);
   }
 
-  // ... innerhalb deiner BackendProvider Klasse ...
+  
 
   Future<void> uploadAvatar(dynamic fileInput) async {
     final user = _supabase.auth.currentUser;
@@ -396,7 +432,7 @@ class BackendProvider with ChangeNotifier {
       final filePath = 'user_$userId/avatar.png';
 
       if (kIsWeb) {
-        // WEB: fileInput MUSS Uint8List sein
+        
         await _supabase.storage
             .from('avatar_profile')
             .uploadBinary(
@@ -405,7 +441,7 @@ class BackendProvider with ChangeNotifier {
               fileOptions: const FileOptions(upsert: true),
             );
       } else {
-        // MOBILE: fileInput MUSS File sein
+       
         await _supabase.storage
             .from('avatar_profile')
             .upload(
@@ -425,7 +461,7 @@ class BackendProvider with ChangeNotifier {
           .eq('id', userId);
 
       avatarUrl = '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-      // selectedImageFile setzen wir nur auf Mobile für die Vorschau
+      
       if (!kIsWeb) selectedImageFile = fileInput as File;
 
       error = null;
@@ -452,7 +488,7 @@ class BackendProvider with ChangeNotifier {
 
       if (res != null && res['avatar_url'] != null) {
         avatarUrl = res['avatar_url'];
-        // Nutze dies:
+      
         avatarUrl = '$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}';
       }
     } catch (e) {
@@ -461,7 +497,6 @@ class BackendProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Datei löschen ---
   Future<void> deletePicture() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -473,21 +508,19 @@ class BackendProvider with ChangeNotifier {
       final userId = user.id;
       final filePath = 'user_$userId/avatar.png';
 
-      // 1. Datei aus dem Supabase Storage entfernen
-      // Wir ignorieren Fehler hier bewusst, falls die Datei bereits gelöscht wurde
       try {
         await _supabase.storage.from('avatar_profile').remove([filePath]);
       } catch (storageError) {
         print('Storage Info: Datei existierte evtl. nicht mehr: $storageError');
       }
 
-      // 2. Den Eintrag in der Datenbank auf null setzen
+    
       await _supabase
           .from('user_profiles')
           .update({'avatar_url': null})
           .eq('id', userId);
 
-      // 3. Lokale States zurücksetzen
+      
       avatarUrl = null;
       selectedImageFile = null;
     } catch (e) {
@@ -499,7 +532,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Home Daten laden
+  
   Future<void> fetchHomeData() async {
     isLoading = true;
     error = null;
@@ -517,7 +550,7 @@ class BackendProvider with ChangeNotifier {
             : user.email?.split('@').first.capitalize() ?? 'User';
         print('🔍 Lade Home-Daten für User: ${user.id}');
 
-        // ✅ ERST aus user_profiles laden
+        //  ERST aus user_profiles laden
         try {
           final profileResponse = await _supabase
               .from('user_profiles')
@@ -528,7 +561,7 @@ class BackendProvider with ChangeNotifier {
           print('📊 Home Profil Response: $profileResponse');
 
           if (profileResponse != null && profileResponse['name'] != null) {
-            // Verwende Daten aus user_profiles
+            //  Daten aus user_profiles
             userName = profileResponse['name'] as String? ?? '';
             profileName = userName;
             profileEmail = profileResponse['email'] as String? ?? '';
@@ -583,16 +616,11 @@ class BackendProvider with ChangeNotifier {
         lastSession = sessions.first as Map<String, dynamic>;
       }
 
-      // NOTE: Don't load modules here to avoid overwriting the full module list.
-      // Modules are loaded via `fetchModules()` to ensure the full set is available.
-
+     
       // --- Statistiken setzen ---
       questionsThisWeek = lastSession?['total_questions'] ?? 0;
-      // Module aus user_statistics berechnen
-      //modulesCompleted = 5; // TODO: aus Datenbank berechnen
-      currentStreak = 7; // TODO: aus Datenbank berechnen
-      // Dummy-Daten (müssen später durch echte Abfragen ersetzt werden)
-      currentStreak = 7;
+     currentStreak = 7; 
+       currentStreak = 7;
     } catch (e) {
       error = 'Daten konnten nicht geladen werden.$e';
       print('Fehler: $e');
@@ -637,6 +665,32 @@ class BackendProvider with ChangeNotifier {
         final achievementId = e['id'] as int;
         final unlockedDate = achievedMap[achievementId];
 
+        String title = e['title']?.toString() ?? '';
+        String description = e['description']?.toString() ?? '';
+
+        switch (achievementId) {
+          case 1:
+            title = 'Erster Start';
+            description = 'Starte deine erste Lernrunde in mc‑Trainer';
+            break;
+          case 2:
+            title = 'Krieger';
+            description = 'Schließe 10 Lektionen ab';
+            break;
+          case 3:
+            title = 'Perfekte Punktzahl';
+            description = 'Erreiche 100% in einem Quiz';
+            break;
+          case 4:
+            title = 'Meister';
+            description = 'Beantworte 30 Fragen';
+            break;
+          case 5:
+            title = 'Spitzenklasse';
+            description = 'Erreiche 1500 Punkte';
+            break;
+        }
+
         final iconIndex = achievementId - 1;
         final icon = (iconIndex >= 0 && iconIndex < achievementsIcon.length)
             ? achievementsIcon[iconIndex]
@@ -648,8 +702,8 @@ class BackendProvider with ChangeNotifier {
         myAchievements.add(
           Achievement(
             id: e['id'],
-            title: e['title'],
-            description: e['description'],
+            title: title,
+            description: description,
             icon: icon,
             color: color,
             isUnlocked: unlockedDate != null,
@@ -667,8 +721,8 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // NEU: Profil Daten abrufen
-  // NEU: Profil Daten abrufen
+  
+  //  Profil Daten abrufen
   Future<void> fetchProfileData() async {
     isLoading = true;
     notifyListeners();
@@ -714,7 +768,7 @@ class BackendProvider with ChangeNotifier {
         print('   - Username: $profileUsername');
         print('   - Mitglied seit: $profileCreatedAt');
 
-        // Falls name leer ist, verwende den aus user_metadata
+        
         if (profileName.isEmpty) {
           final fullName = user.userMetadata?['full_name'];
           profileName = (fullName != null && fullName.isNotEmpty)
@@ -723,7 +777,7 @@ class BackendProvider with ChangeNotifier {
         }
       } else {
         print(' Kein Profil gefunden, setze Standardwerte');
-        // Fallback auf User Metadata
+        
         final fullName = user.userMetadata?['full_name'];
         profileName = (fullName != null && fullName.isNotEmpty)
             ? fullName
@@ -757,38 +811,39 @@ class BackendProvider with ChangeNotifier {
       if (sessionsResponse.isNotEmpty) {
         int totalQuestions = 0;
         int correctAnswers = 0;
-        int totalDuration = 0;
+        int totalDurationMinutes = 0;
 
         for (var session in sessionsResponse) {
           totalQuestions += (session['total_questions'] as int?) ?? 0;
           correctAnswers += (session['correct_answered'] as int?) ?? 0;
           final durationMinutes =
               (session['timer_duration_minutes'] as int?) ?? 0;
-          totalDuration +=
-              durationMinutes * 60; // Minuten zu Sekunden umrechnen
+          totalDurationMinutes += durationMinutes;
         }
 
         this.totalQuestions = totalQuestions;
-        learnedHours = (totalDuration / 3600).round(); // Sekunden zu Stunden
+        learnedMinutes = totalDurationMinutes;
+        learnedHours = (totalDurationMinutes / 60).floor();
         averageScore = totalQuestions > 0
             ? (correctAnswers / totalQuestions * 100)
             : 0.0;
       }
 
-      // Abgeschlossene Module aus user_statistics
-      try {
-        final statisticsResponse = await _supabase
-            .from('user_statistics')
-            .select('modules_completed')
+         try {
+        final completedSessions = await _supabase
+            .from('learning_sessions')
+            .select('submodules_id')
             .eq('user_id', userId)
-            .single();
+            .eq('iscompleted', true);
 
-        if (statisticsResponse != null) {
-          modulesCompleted =
-              (statisticsResponse['modules_completed'] as int?) ?? 0;
-        }
+        final completedIds = completedSessions
+            .map((row) => row['submodules_id'])
+            .whereType<int>()
+            .toSet();
+
+        modulesCompleted = completedIds.length;
       } catch (e) {
-        print('Keine user_statistics für User $userId gefunden: $e');
+        print('Keine completed sessions für User $userId gefunden: $e');
         modulesCompleted = 0;
       }
     } catch (e) {
@@ -796,7 +851,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // NEU: Statistiken für HomeScreen berechnen
+  //  Statistiken für HomeScreen berechnen
   Future<void> _calculateUserStatistics() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -847,7 +902,7 @@ class BackendProvider with ChangeNotifier {
 
       print('✅ User gefunden: ${user.id}, ${user.email}');
 
-      //  Prüfe ob Email geändert wurde
+      //  ob Email geändert wurde
       final originalAuthEmail = user.email ?? '';
       bool emailChanged = email != originalAuthEmail;
 
@@ -916,7 +971,7 @@ class BackendProvider with ChangeNotifier {
             print('⚠️ Unbekannter Fehler: $authError');
           }
 
-          // Auch bei Fehler weiter machen, da user_profiles schon aktualisiert
+          
         }
       }
 
@@ -954,9 +1009,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Module separat laden (z.B. für Modules Screen)
-  // In BackendProvider - Ersetze die fetchModules Methode vollständig:
-
+  
   Future<void> fetchModules() async {
     isLoading = true;
     notifyListeners();
@@ -964,8 +1017,7 @@ class BackendProvider with ChangeNotifier {
     try {
       final user = _supabase.auth.currentUser;
 
-      // Für nicht-eingeloggte User nur Default-Module
-      if (user == null) {
+       if (user == null) {
         final defaultModules =
             await _supabase.from('modules').select('*').eq('default', true)
                 as List<dynamic>;
@@ -982,8 +1034,6 @@ class BackendProvider with ChangeNotifier {
         return;
       }
 
-      // Für eingeloggte User:
-      // 1. Gelöschte Module für diesen User
       final deletedModules =
           await _supabase
                   .from('deleted_modules')
@@ -995,7 +1045,7 @@ class BackendProvider with ChangeNotifier {
           .map((dm) => dm['module_id'] as int)
           .toSet();
 
-      // 2. Importierte Module (nicht gelöscht)
+      
       final importedModules =
           await _supabase
                   .from('imported_modules')
@@ -1008,12 +1058,12 @@ class BackendProvider with ChangeNotifier {
           .map((im) => im['module_id'] as int)
           .toSet();
 
-      // 3. Hole alle Standard-Module (default = true)
+      
       final defaultModules =
           await _supabase.from('modules').select('*').eq('default', true)
               as List<dynamic>;
 
-      // 4. Hole alle importierten Module
+      
       List<dynamic> importedModulesData = [];
       if (importedIds.isNotEmpty) {
         importedModulesData =
@@ -1024,10 +1074,10 @@ class BackendProvider with ChangeNotifier {
                 as List<dynamic>;
       }
 
-      // 5. Kombiniere alle Module
+      
       final combined = <int, Map<String, dynamic>>{};
 
-      // Füge Default-Module hinzu (außer gelöschte)
+      
       for (final e in defaultModules) {
         final m = e as Map<String, dynamic>;
         final id = m['id'] as int;
@@ -1036,14 +1086,14 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // Füge importierte Module hinzu
+      
       for (final e in importedModulesData) {
         final m = e as Map<String, dynamic>;
         final id = m['id'] as int;
         combined[id] = m;
       }
 
-      // Konvertiere zu LernenModule Liste
+      
       lastModules = combined.values.map((e) {
         final m = e as Map<String, dynamic>;
         return LernenModule(
@@ -1074,21 +1124,21 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
 
-      // Entferne aus deleted_modules (für Standard-Module)
+      
       await _supabase
           .from('deleted_modules')
           .delete()
           .eq('user_id', user.id)
           .eq('module_id', moduleId);
 
-      // Reaktiviere in imported_modules (für importierte Module)
+      
       await _supabase
           .from('imported_modules')
           .update({'is_deleted': false, 'deleted_at': null})
           .eq('user_id', user.id)
           .eq('module_id', moduleId);
 
-      // Listen aktualisieren
+   
       await fetchModules();
       await fetchImportableModules();
 
@@ -1099,11 +1149,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // --- Fortschritte aus Supabase laden und Module/Submodule aktualisieren ---
-
-  /// Berechnet den Fortschritt eines Moduls basierend auf seinen Submodulen
-  /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
-  Future<double> calculateModuleProgress(dynamic moduleId) async {
+    Future<double> calculateModuleProgress(dynamic moduleId) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0.0;
@@ -1121,13 +1167,13 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // Lade alle Submodule des Moduls
+      
       final submodules = await fetchSubmodules(moduleId);
       if (submodules.isEmpty) return 0.0;
 
       int completedSubmodules = 0;
 
-      // Prüfe für jedes Submodule, ob es completed ist
+      
       for (var submodule in submodules) {
         final submoduleId = submodule['id'];
         final isCompleted = await isSubmoduleCompleted(submoduleId);
@@ -1136,7 +1182,7 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // Berechne Fortschritt als Prozentsatz
+      
       final progress = (completedSubmodules / submodules.length);
       debugPrint(
         '📊 Module $moduleId: $completedSubmodules/${submodules.length} submodules completed = ${(progress * 100).toStringAsFixed(1)}%',
@@ -1153,13 +1199,20 @@ class BackendProvider with ChangeNotifier {
       return 0.0;
     }
   }
-
-  /// Berechnet den Fortschritt eines Submoduls basierend auf den Karten (Level)
-  /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
-  Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
+ Future<double> calculateSubmoduleProgress(dynamic submoduleId) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0.0;
+
+     
+      final questionsResponse =
+          await _supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('submodule_id', submoduleId)
+              as List<dynamic>;
+
+      if (questionsResponse.isEmpty) return 0.0;
 
       if (_moduleProgressCacheUserId != user.id) {
         _clearProgressCache();
@@ -1174,7 +1227,7 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // Wenn Submodule bereits als completed markiert ist, zeige 100%
+      
       final submoduleCheck =
           await _supabase
                   .from('submodules')
@@ -1193,7 +1246,7 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // 1. Verwende die beste Session-Accuracy (damit sich die Note nicht verschlechtert)
+    
       final bestSession =
           await _supabase
                   .from('learning_sessions')
@@ -1218,7 +1271,7 @@ class BackendProvider with ChangeNotifier {
         return progress;
       }
 
-      // 2. Versuche Fortschritt aus Level-Tabelle zu berechnen (cards_answered)
+      
       final levelProgressList =
           await _supabase
                   .from('user_submodule_level_progress')
@@ -1255,17 +1308,8 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // 3. Fallback: Fortschritt anhand beantworteter Fragen berechnen
-      final questionsResponse =
-          await _supabase
-                  .from('questions')
-                  .select('id')
-                  .eq('submodule_id', submoduleId)
-              as List<dynamic>;
-
-      if (questionsResponse.isEmpty) return 0.0;
-
-      final questionIds = questionsResponse.map((c) => c['id']).toList();
+        
+        final questionIds = questionsResponse.map((c) => c['id']).toList();
       debugPrint(
         '📊 Submodule $submoduleId: ${questionIds.length} total questions',
       );
@@ -1297,8 +1341,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  /// Berechnet den Fortschritt eines Levels basierend auf gemeisterten Karten
-  /// Gibt Fortschritt zwischen 0.0 und 1.0 zurück
+  
   Future<double> calculateLevelProgress(
     dynamic submoduleId,
     int levelNumber,
@@ -1307,7 +1350,7 @@ class BackendProvider with ChangeNotifier {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0.0;
 
-      // Lade den Level-Fortschritt
+      
       final levelProgress =
           await _supabase
                   .from('user_submodule_level_progress')
@@ -1335,8 +1378,6 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  /// Lädt alle Fortschritts-Daten aus Supabase und aktualisiert sie in der lokalen Liste
-  /// Dies ist die Haupt-Methode, die aufgerufen werden sollte, um alle Fortschritte zu aktualisieren
   Future<Map<int, Map<String, dynamic>>> loadUserProgressForModules(
     List<LernenModule> modules,
   ) async {
@@ -1458,10 +1499,15 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  /// Aktualisiert ein einzelnes Modul mit seinem Fortschritt aus der Datenbank
+  
   Future<void> updateModuleProgress(dynamic moduleId) async {
     try {
       debugPrint('🔄 Aktualisiere Fortschritt für Modul $moduleId...');
+      if (moduleId is int) {
+        _moduleProgressValueCache.remove(moduleId);
+        _moduleProgressValueCacheAt.remove(moduleId);
+        _moduleProgressCache.remove(moduleId);
+      }
       final progress = await calculateModuleProgress(moduleId);
       debugPrint(
         '✅ Modul $moduleId: ${(progress * 100).toStringAsFixed(1)}% Fortschritt',
@@ -1476,6 +1522,12 @@ class BackendProvider with ChangeNotifier {
   Future<void> updateSubmoduleProgress(dynamic submoduleId) async {
     try {
       debugPrint('🔄 Aktualisiere Fortschritt für Submodul $submoduleId...');
+      if (submoduleId is int) {
+        _submoduleProgressCache.remove(submoduleId);
+        _submoduleProgressCacheAt.remove(submoduleId);
+        _submoduleCompletedCache.remove(submoduleId);
+        _submoduleCompletedCacheAt.remove(submoduleId);
+      }
       final progress = await calculateSubmoduleProgress(submoduleId);
       debugPrint(
         '✅ Submodul $submoduleId: ${(progress * 100).toStringAsFixed(1)}% Fortschritt',
@@ -1490,6 +1542,7 @@ class BackendProvider with ChangeNotifier {
   Future<void> refreshAllProgress() async {
     try {
       debugPrint('🔄 Aktualisiere alle Fortschritte...');
+      _clearProgressCache();
       await loadUserProgressForModules(lastModules);
       debugPrint('✅ Alle Fortschritte aktualisiert');
       notifyListeners();
@@ -1497,6 +1550,100 @@ class BackendProvider with ChangeNotifier {
       debugPrint('❌ Error refreshing progress: $e');
       error = 'Konnte Fortschritte nicht aktualisieren: $e';
       notifyListeners();
+    }
+  }
+
+  Future<int?> _getNextSubmoduleId(int moduleId, int currentSubmoduleId) async {
+    try {
+      final subs =
+          await _supabase
+                  .from('submodules')
+                  .select('id, level')
+                  .eq('modules_id', moduleId)
+                    .order('level', ascending: true)
+                  .order('id', ascending: true)
+              as List<dynamic>;
+
+      final ids = subs.map((e) => e['id'] as int).toList();
+      final idx = ids.indexOf(currentSubmoduleId);
+      if (idx == -1) return null;
+      if (idx + 1 >= ids.length) return null;
+      return ids[idx + 1];
+    } catch (e) {
+      debugPrint('Fehler beim Ermitteln des nächsten Submodules: $e');
+      return null;
+    }
+  }
+
+  Future<ResumeTarget?> getResumeTarget() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return null;
+
+      final sessions =
+          await _supabase
+                  .from('learning_sessions')
+                  .select('submodules_id, start_time, end_time')
+                  .eq('user_id', user.id)
+                    .order('end_time', ascending: false)
+                  .order('start_time', ascending: false)
+                  .limit(1)
+              as List<dynamic>;
+
+      if (sessions.isEmpty) return null;
+      final session = sessions.first as Map<String, dynamic>;
+      final submoduleId = session['submodules_id'] as int?;
+      if (submoduleId == null) return null;
+
+        final submodule =
+          await _supabase
+              .from('submodules')
+              .select('id, modules_id')
+              .eq('id', submoduleId)
+              .maybeSingle()
+            as Map<String, dynamic>?;
+      if (submodule == null) return null;
+
+      final moduleId = submodule['modules_id'] as int?;
+      if (moduleId == null) return null;
+
+      var resumeSubmoduleId = submoduleId;
+      final progress = await calculateSubmoduleProgress(submoduleId);
+      if (progress >= 0.8) {
+        final nextId = await _getNextSubmoduleId(moduleId, submoduleId);
+        if (nextId != null) {
+          resumeSubmoduleId = nextId;
+        }
+      }
+
+      final resumeSubmodule =
+          await _supabase
+                  .from('submodules')
+                  .select('id, title')
+                  .eq('id', resumeSubmoduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+      if (resumeSubmodule == null) return null;
+
+      final module =
+          await _supabase
+                  .from('modules')
+                  .select('id, title, description')
+                  .eq('id', moduleId)
+                  .maybeSingle()
+              as Map<String, dynamic>?;
+      if (module == null) return null;
+
+      return ResumeTarget(
+        moduleId: moduleId,
+        submoduleId: resumeSubmoduleId,
+        moduleTitle: (module['title'] ?? '').toString(),
+        moduleDescription: (module['description'] ?? '').toString(),
+        submoduleTitle: (resumeSubmodule['title'] ?? '').toString(),
+      );
+    } catch (e) {
+      debugPrint('Fehler beim Laden des Resume-Targets: $e');
+      return null;
     }
   }
 
@@ -1587,7 +1734,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // In BackendProvider Klasse fügen Sie diese Methoden hinzu:
+  
 
   // Reset-Methode
   void reset() {
@@ -1603,6 +1750,7 @@ class BackendProvider with ChangeNotifier {
     profileAvatarUrl = null;
     profileCreatedAt = '';
     learnedHours = 0;
+    learnedMinutes = 0;
     averageScore = 0.0;
     totalQuestions = 0;
 
@@ -1664,11 +1812,19 @@ class BackendProvider with ChangeNotifier {
       debugPrint('deleteSubmodules error: $e');
     }
   }
-  // NEU: Prüfe ob ein Submodule abgeschlossen ist (alle Cards gemeistert ODER iscompleted=true)
+
   Future<bool> isSubmoduleCompleted(dynamic submoduleId) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
+
+      final questions =
+          await _supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('submodule_id', submoduleId)
+              as List<dynamic>;
+      if (questions.isEmpty) return false;
 
       if (_moduleProgressCacheUserId != user.id) {
         _clearProgressCache();
@@ -1683,7 +1839,7 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // Zuerst prüfe ob `iscompleted` in der Datenbank true ist
+    
       final submoduleCheck =
           await _supabase
                   .from('submodules')
@@ -1731,7 +1887,7 @@ class BackendProvider with ChangeNotifier {
         }
       }
 
-      // Lade alle Cards für dieses Submodule
+    
       final cards =
           await _supabase
                   .from('questions')
@@ -1743,7 +1899,7 @@ class BackendProvider with ChangeNotifier {
 
       final cardIds = cards.map((c) => c['id']).toList();
 
-      // Prüfe wie viele Cards der Nutzer gemeistert hat
+      
       final userProgress =
           await _supabase
                   .from('user_card_progress')
@@ -1759,7 +1915,7 @@ class BackendProvider with ChangeNotifier {
           )
           .length;
 
-      // Completed wenn mindestens 80% gemeistert
+      
       final completion = (masteredCount / cardIds.length) * 100;
       debugPrint(
         '✅ Submodule $submoduleId: $masteredCount/${cardIds.length} mastered = ${completion.toStringAsFixed(1)}%',
@@ -1776,7 +1932,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Markiere Submodule als completed in der Datenbank
+ 
   Future<void> markSubmoduleAsCompleted(dynamic submoduleId) async {
     try {
       debugPrint('📌 Markiere Submodule $submoduleId als completed...');
@@ -1790,7 +1946,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // --- Karten für Submodule + Level laden ---
+
   Future<List<Map<String, dynamic>>> fetchCardsForSubmoduleLevel(
     dynamic submoduleId,
     int level,
@@ -1813,7 +1969,7 @@ class BackendProvider with ChangeNotifier {
       );
 
       if (cards.isEmpty) {
-        // Fallback: lade alle Fragen für das Submodule ohne Level-Filter
+        
         debugPrint(
           'fetchCardsForSubmoduleLevel: fallback to submodule-only query',
         );
@@ -1837,7 +1993,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // --- ALLE Fragen eines Submoduls laden (für Quiz-Session) ---
+  
   Future<List<Map<String, dynamic>>> fetchAllQuestionsForSubmodule(
     dynamic submoduleId,
   ) async {
@@ -1860,7 +2016,7 @@ class BackendProvider with ChangeNotifier {
         return questions.map((e) => e as Map<String, dynamic>).toList();
       }
 
-      // Entferne Karten, die bereits 6x in Folge richtig beantwortet wurden
+      
       final mastered =
           await _supabase
                   .from('user_card_progress')
@@ -2011,6 +2167,7 @@ class BackendProvider with ChangeNotifier {
       }
 
       lastSession = session;
+      await addAchievement(1); // First Visit: beim Start der ersten Lernrunde
       notifyListeners();
       return sessionId;
     } catch (e) {
@@ -2076,6 +2233,8 @@ class BackendProvider with ChangeNotifier {
         );
       }
 
+      await _checkAndUnlockAchievements(accuracy: accuracy);
+
       //  Setze is_completed in user_submodule_level_progress bei 100%
       if (accuracy == 100) {
         final user = _supabase.auth.currentUser;
@@ -2106,6 +2265,52 @@ class BackendProvider with ChangeNotifier {
       error = 'Konnte Session nicht beenden: $e';
       debugPrint('❌ finishLearningSession error: $e');
       notifyListeners();
+    }
+  }
+
+  Future<void> _checkAndUnlockAchievements({required int accuracy}) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final sessions = await _supabase
+          .from('learning_sessions')
+          .select('total_questions, iscompleted, submodules_id')
+          .eq('user_id', user.id) as List<dynamic>;
+
+      int totalQuestions = 0;
+      final completedSubmodules = <int>{};
+      for (final s in sessions) {
+        totalQuestions += (s['total_questions'] as int?) ?? 0;
+        if (s['iscompleted'] == true) {
+          final subId = s['submodules_id'];
+          if (subId is int) completedSubmodules.add(subId);
+        }
+      }
+
+      if (accuracy == 100) {
+        await addAchievement(3); // Perfect Score
+      }
+
+      if (completedSubmodules.length >= 10) {
+        await addAchievement(2); // Warrior
+      }
+
+      if (totalQuestions >= 30) {
+        await addAchievement(4); // Master
+      }
+
+      final profile = await _supabase
+          .from('user_profiles')
+          .select('achieved_points')
+          .eq('id', user.id)
+          .maybeSingle();
+      final currentPoints = (profile?['achieved_points'] as int?) ?? 0;
+      if (currentPoints >= 1500) {
+        await addAchievement(5); // Top of Class
+      }
+    } catch (e) {
+      debugPrint('_checkAndUnlockAchievements error: $e');
     }
   }
 
@@ -2171,7 +2376,7 @@ class BackendProvider with ChangeNotifier {
             .eq('id', progress['id']);
       }
 
-      // Nach Update: berechne Level-Fortschritt und evtl. freischalten
+      // berechnen Level-Fortschritt und evtl. freischalten
       await _recalculateSubmoduleLevelProgressForCard(cardId, user.id);
       notifyListeners();
     } catch (e) {
@@ -2180,7 +2385,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // --- Hilfsfunktion: Level-Fortschritt neu berechnen und ggf. freischalten ---
+  //  Hilfsfunktion: Level-Fortschritt neu berechnen und ggf. freischalten
   Future<void> _recalculateSubmoduleLevelProgressForCard(
     String cardId,
     String userId,
@@ -2291,7 +2496,7 @@ class BackendProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-      // Nicht fatal: nur melden
+     
       print('Fehler beim Neuberechnen des Level-Fortschritts: $e');
     }
   }
@@ -2319,15 +2524,12 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Optional: Clear-Methode für Logout
+  // Clear-Methode für Logout
   void clearData() {
     reset();
   }
-  // In backend_provider.dart - NEUE IMPORT-METHODEN
-
-  // In BackendProvider - Erweitere die fetchImportableModules Methode:
-
-  // In BackendProvider - Korrigiere die Logik in fetchImportableModules:
+  
+  
 
   Future<void> fetchImportableModules() async {
     isLoading = true;
@@ -2340,12 +2542,12 @@ class BackendProvider with ChangeNotifier {
 
       print('🔍 Lade importierbare Module für User: ${user.id}');
 
-      // 1. Lade ALLE nicht-Standard Module
+      
       final allNonDefaultModules =
           await _supabase.from('modules').select('*').eq('default', false)
               as List<dynamic>;
 
-      // 2. Lade Import-Status für diesen User
+     
       final importedEntries =
           await _supabase
                   .from('imported_modules')
@@ -2353,7 +2555,7 @@ class BackendProvider with ChangeNotifier {
                   .eq('user_id', user.id)
               as List<dynamic>;
 
-      // 3. Erstelle Map für schnellen Zugriff
+     
       final importStatus = <int, Map<String, dynamic>>{};
       for (var entry in importedEntries) {
         final e = entry as Map<String, dynamic>;
@@ -2366,7 +2568,7 @@ class BackendProvider with ChangeNotifier {
         };
       }
 
-      // 4. Baue availableModules auf
+     
       availableModules.clear();
 
       for (var dbModule in allNonDefaultModules) {
@@ -2417,10 +2619,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Korrigierte importModule Methode:
-
-  // In BackendProvider - Ersetze die importModule Methode vollständig:
-
+ 
   Future<bool> importModule(ImportableModule module) async {
     isLoading = true;
     notifyListeners();
@@ -2471,7 +2670,7 @@ class BackendProvider with ChangeNotifier {
               .eq('id', existingImport['id']);
           print('✅ Gelöschtes Modul re-importiert');
         } else {
-          // Download-Count erhöhen
+          
           await _supabase
               .from('imported_modules')
               .update({
@@ -2498,14 +2697,11 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // --- Simulation externer Server-Abfrage ---
-  // Korrigierte _simulateExternalServerCall Methode:
+ 
   Future<List<Map<String, dynamic>>> _simulateExternalServerCall() async {
-    // Diese Methode wird nicht mehr benötigt, da wir direkt aus der DB laden
-    // Sie können sie entweder leer lassen oder ganz entfernen
     await Future.delayed(const Duration(milliseconds: 500));
 
-    return []; // Leere Liste zurückgeben, da wir aus DB laden
+    return [];
   }
 
   // Methode um zu prüfen, ob ein Modul importierbar ist (nicht default)
@@ -2645,18 +2841,14 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // In BackendProvider Klasse, nach den anderen Methoden:
-
-  // Prüft ob ein Modul für den User sichtbar ist (in imported_modules vorhanden)
-  // Ersetze diese Methode:
-  // In BackendProvider - Ersetze isModuleAvailableToUser:
+  
 
   Future<bool> isModuleAvailableToUser(int moduleId) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
 
-      // 1. Prüfe ob der User dieses Modul gelöscht hat
+      
       final deleted =
           await _supabase
                   .from('deleted_modules')
@@ -2673,7 +2865,7 @@ class BackendProvider with ChangeNotifier {
         return false;
       }
 
-      // 2. Hole Modul-Daten
+      
       final module =
           await _supabase
                   .from('modules')
@@ -2687,10 +2879,10 @@ class BackendProvider with ChangeNotifier {
       final bool isDefault = (module['default'] as bool?) == true;
 
       if (isDefault) {
-        // Standard-Module sind verfügbar, solange nicht gelöscht
+        
         return true;
       } else {
-        // Nicht-Standard Module: Prüfe ob importiert
+        
         final imported =
             await _supabase
                     .from('imported_modules')
@@ -2708,7 +2900,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // Prüft ob ein Modul ein Standard-Modul ist
+  
   Future<bool> isModuleDefault(int moduleId) async {
     try {
       final module =
@@ -2726,8 +2918,7 @@ class BackendProvider with ChangeNotifier {
     }
   }
 
-  // In BackendProvider - Ersetze die bestehende deleteModule Methode vollständig:
-
+  
   Future<bool> deleteModule(int moduleId, String moduleTitle) async {
     isLoading = true;
     notifyListeners();
@@ -2738,11 +2929,10 @@ class BackendProvider with ChangeNotifier {
 
       print('🗑️ Lösche Modul: $moduleTitle');
 
-      // Nur für importierte Module (nicht-Standard)
-      final isDefault = await isModuleDefault(moduleId);
+         final isDefault = await isModuleDefault(moduleId);
 
       if (isDefault) {
-        // Für Standard-Module: in deleted_modules protokollieren
+       
         await _supabase.from('deleted_modules').insert({
           'module_id': moduleId,
           'user_id': user.id,
@@ -2750,7 +2940,7 @@ class BackendProvider with ChangeNotifier {
         });
         print('✅ Standard-Modul für User versteckt');
       } else {
-        // Für importierte Module: Soft-Delete in imported_modules
+       
         final importEntry =
             await _supabase
                     .from('imported_modules')

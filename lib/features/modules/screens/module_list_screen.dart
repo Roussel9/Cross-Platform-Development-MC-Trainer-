@@ -1,10 +1,12 @@
 // features/modules/screens/module_list_screen.dart (VOLLSTÄNDIG KORRIGIERT für Hover/Click-Hybrid)
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mc_trainer_kami/models/module_data.dart';
 import 'package:mc_trainer_kami/models/lernen_module.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/widgets/custom_app_appbar.dart';
 import 'package:mc_trainer_kami/core/widgets/app_bar_actions.dart';
@@ -91,7 +93,7 @@ class LessonTile extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${lesson.questions} questions',
+                      '${lesson.questions} Fragen',
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontSize: 13,
@@ -250,7 +252,7 @@ class _ModuleCardState extends State<ModuleCard> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  'Completed',
+                                  'Abgeschlossen',
                                   style: TextStyle(
                                     color: Colors.green.shade700,
                                     fontSize: 10,
@@ -302,18 +304,19 @@ class _ModuleCardState extends State<ModuleCard> {
                           ],
                         ),
                         const SizedBox(height: 5),
-                        Text(
-                          '${widget.module.completedLessons}/${widget.module.totalLessons} lessons',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade500,
+                        if (widget.module.totalLessons > 0)
+                          Text(
+                            '${widget.module.completedLessons}/${widget.module.totalLessons} Lektionen',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
 
-                  // Navigations-Button (nur wenn nicht im Auswahlmodus)
+                  // Navigations-Button 
                   if (!widget.isSelectionMode)
                     const Padding(
                       padding: EdgeInsets.only(left: 8.0, top: 10),
@@ -345,7 +348,7 @@ class _ModuleCardState extends State<ModuleCard> {
   }
 }
 
-// Ändere die ModuleListScreen Klasse:
+
 
 class ModuleListScreen extends StatefulWidget {
   const ModuleListScreen({super.key});
@@ -358,10 +361,33 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
 
-  // NEUE VARIABLEN FÜR CAB
+ 
   bool _isSelectionMode = false;
   Set<int> _selectedModuleIds = {};
-  List<Module> _currentModules = []; // SPEICHERE AKTUELLE MODULE
+  List<Module> _currentModules = []; 
+  String _moduleQuery = '';
+
+  bool _matchesModuleQuery(Module module, String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return true;
+
+    final title = module.title.toLowerCase();
+    final desc = module.description.toLowerCase();
+
+    final titleWords = title.split(RegExp(r'\s+'));
+    final descWords = desc.split(RegExp(r'\s+'));
+
+    // 1) Titel-Präfixe bevorzugen
+    if (titleWords.any((w) => w.startsWith(q))) return true;
+
+    // 2) Titel-Teiltreffer nur bei längerer Eingabe
+    if (q.length >= 3 && title.contains(q)) return true;
+
+    // 3) Beschreibung nur bei längerer Eingabe und Wort-Präfix
+    if (q.length >= 4 && descWords.any((w) => w.startsWith(q))) return true;
+
+    return false;
+  }
 
   Future<void> _refreshModules() async {
     final backend = context.read<BackendProvider>();
@@ -369,11 +395,56 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
     _exitSelectionMode(); // Auswahlmodus beenden
   }
 
-  // NEUE METHODEN FÜR CAB
+  Future<({int total, int completed, double progress})> _loadModuleProgress(
+    Module module,
+    BackendProvider provider,
+  ) async {
+    final moduleId = module.id;
+    if (moduleId == null) {
+      return (total: 0, completed: 0, progress: 0.0);
+    }
+
+    final submodules = await provider.fetchSubmodules(moduleId);
+    if (submodules.isEmpty) {
+      return (total: 0, completed: 0, progress: 0.0);
+    }
+
+    int completed = 0;
+    for (final sub in submodules) {
+      final isCompleted = await provider.isSubmoduleCompleted(sub['id']);
+      if (isCompleted) completed++;
+    }
+
+    final total = submodules.length;
+    final progress = total == 0 ? 0.0 : (completed / total);
+    return (total: total, completed: completed, progress: progress);
+  }
+
+  //  METHODEN FÜR CAB
   void _enterSelectionMode() {
     setState(() {
       _isSelectionMode = true;
     });
+  }
+
+  void _syncSelectionWithModules() {
+    final validIds = _currentModules
+        .map((m) => m.id)
+        .whereType<int>()
+        .toSet();
+    final newSelected = _selectedModuleIds.intersection(validIds);
+
+    if (!setEquals(newSelected, _selectedModuleIds)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _selectedModuleIds = newSelected;
+          if (_selectedModuleIds.isEmpty) {
+            _isSelectionMode = false;
+          }
+        });
+      });
+    }
   }
 
   void _exitSelectionMode() {
@@ -399,7 +470,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
 
   void _selectAllModules() {
     setState(() {
-      // Verwende _currentModules statt Parameter
+      // _currentModules Verwenden 
       _selectedModuleIds = Set.from(
         _currentModules.map((m) => m.id ?? 0).where((id) => id > 0),
       );
@@ -409,7 +480,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
   void _showDeleteDialog() async {
     final backend = Provider.of<BackendProvider>(context, listen: false);
 
-    // Finde ausgewählte Module aus _currentModules
+    //  ausgewählte Module aus _currentModules finden 
     final selectedModules = _currentModules
         .where((m) => m.id != null && _selectedModuleIds.contains(m.id))
         .toList();
@@ -472,10 +543,10 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
     );
   }
 
-  // NEUE APP BAR FÜR CAB
+  //  APP BAR FÜR CAB
   AppBar _buildSelectionAppBar() {
     return AppBar(
-      backgroundColor: Colors.blue, // Verwende eine feste Farbe
+      backgroundColor: Colors.blue,
       leading: IconButton(
         icon: const Icon(Icons.close, color: Colors.white),
         onPressed: _exitSelectionMode,
@@ -513,7 +584,7 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: _isSelectionMode
-              ? _buildSelectionAppBar() // Keine Parameter mehr nötig
+              ? _buildSelectionAppBar() 
               : CustomAppBar(
                   title: 'Browse Modules',
                   subtitle:
@@ -586,6 +657,8 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                       );
                     }).toList();
 
+                    _syncSelectionWithModules();
+
                     if (_currentModules.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.all(32.0),
@@ -627,11 +700,116 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                       );
                     }
 
-                    return Column(
+                    final userId =
+                        Supabase.instance.client.auth.currentUser?.id;
+
+                    final filteredModules = _moduleQuery.isEmpty
+                      ? _currentModules
+                      : _currentModules
+                        .where((m) => _matchesModuleQuery(m, _moduleQuery))
+                        .toList();
+
+                    final listContent = Column(
                       children: [
+                        TextField(
+                          onChanged: (value) {
+                            setState(() {
+                              _moduleQuery = value.trim();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Module suchen...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _moduleQuery.isEmpty
+                                ? null
+                                : IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setState(() {
+                                        _moduleQuery = '';
+                                      });
+                                    },
+                                  ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredModules.length,
+                          itemBuilder: (context, index) {
+                            final module = filteredModules[index];
+                            return FutureBuilder<({
+                              int total,
+                              int completed,
+                              double progress
+                            })>(
+                              future: _loadModuleProgress(module, provider),
+                              builder: (context, snapshot) {
+                                final data = snapshot.data;
+                                final displayModule = Module(
+                                  id: module.id,
+                                  title: module.title,
+                                  description: module.description,
+                                  totalLessons: data?.total ?? 0,
+                                  completedLessons: data?.completed ?? 0,
+                                  progress: data?.progress ?? 0.0,
+                                  iconColor: module.iconColor,
+                                  icon: module.icon,
+                                  lessons: module.lessons,
+                                  isCompleted:
+                                      (data?.progress ?? 0.0) >= 1.0,
+                                );
+
+                                return ModuleCard(
+                                  module: displayModule,
+                                  isSelected:
+                                      module.id != null &&
+                                      _selectedModuleIds.contains(module.id),
+                                  isSelectionMode: _isSelectionMode,
+                                  onLongPress: () {
+                                    if (!_isSelectionMode) {
+                                      _enterSelectionMode();
+                                    }
+                                    if (module.id != null) {
+                                      _toggleSelection(module.id!);
+                                    }
+                                  },
+                                  onTap: () async {
+                                    if (_isSelectionMode && module.id != null) {
+                                      _toggleSelection(module.id!);
+                                      return;
+                                    }
+
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            LessonListScreen(module: module),
+                                      ),
+                                    );
+                                    if (!mounted) return;
+                                    await provider.refreshAllProgress();
+                                    setState(() {});
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
                         if (!_isSelectionMode) // Nur zeigen, wenn nicht im Auswahlmodus
                           Container(
-                            margin: const EdgeInsets.only(bottom: 16),
+                            margin: const EdgeInsets.only(top: 16),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.blue[50],
@@ -660,43 +838,21 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                               ],
                             ),
                           ),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _currentModules.length,
-                          itemBuilder: (context, index) {
-                            final module = _currentModules[index];
-                            return ModuleCard(
-                              module: module,
-                              isSelected:
-                                  module.id != null &&
-                                  _selectedModuleIds.contains(module.id),
-                              isSelectionMode: _isSelectionMode,
-                              onLongPress: () {
-                                if (!_isSelectionMode) {
-                                  _enterSelectionMode();
-                                }
-                                if (module.id != null) {
-                                  _toggleSelection(module.id!);
-                                }
-                              },
-                              onTap: () {
-                                if (_isSelectionMode && module.id != null) {
-                                  _toggleSelection(module.id!);
-                                } else {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          LessonListScreen(module: module),
-                                    ),
-                                  );
-                                }
-                              },
-                            );
-                          },
-                        ),
                       ],
+                    );
+
+                    if (userId == null) {
+                      return listContent;
+                    }
+
+                    return StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: Supabase.instance.client
+                          .from('learning_sessions')
+                          .stream(primaryKey: ['id'])
+                          .eq('user_id', userId),
+                      builder: (context, _) {
+                        return listContent;
+                      },
                     );
                   },
                 ),

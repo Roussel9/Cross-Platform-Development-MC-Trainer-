@@ -501,53 +501,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
 
                 SizedBox(height: isSmallScreen ? 8 : 16),
-                Row(
-                  children: [
-                    _buildCounterItem(
-                      count: provider.totalQuestions.toString(),
-                      label: 'Fragen',
-                      isSmallScreen: isSmallScreen,
-                    ),
-                    SizedBox(width: isSmallScreen ? 12 : 20),
-                    _buildCounterItem(
-                      count: provider.modulesCompleted.toString(),
-                      label: 'Module',
-                      isSmallScreen: isSmallScreen,
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCounterItem({
-    required String count,
-    required String label,
-    required bool isSmallScreen,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          count,
-          style: TextStyle(
-            fontSize: isSmallScreen ? 16 : 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isSmallScreen ? 10 : 12,
-            color: Colors.white.withOpacity(0.8),
-          ),
-        ),
-      ],
     );
   }
 
@@ -590,8 +548,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Gelernte Stunden
               _buildStatRow(
                 icon: Icons.timer_outlined,
-                label: 'Gelernte Stunden',
-                value: '${provider.learnedHours}h',
+                label: 'Gelernte Minuten',
+                value: '${provider.learnedMinutes} min',
                 valueColor: Colors.green,
                 isSmallScreen: isSmallScreen,
               ),
@@ -608,9 +566,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               _buildStatRow(
                 icon: Icons.check_circle_outline,
-                label: 'Module abgeschlossen',
-                value: '${provider.modulesCompleted}/12',
+                label: 'Submodule abgeschlossen',
+                value: '${provider.modulesCompleted}',
                 valueColor: Colors.orange,
+                isSmallScreen: isSmallScreen,
+              ),
+              SizedBox(height: isSmallScreen ? 12 : 16),
+
+              _buildStatRow(
+                icon: Icons.help_outline,
+                label: 'Fragen beantwortet',
+                value: provider.totalQuestions.toString(),
+                valueColor: AppColors.primaryColorDark,
                 isSmallScreen: isSmallScreen,
               ),
             ],

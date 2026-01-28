@@ -6,10 +6,11 @@ import 'package:mc_trainer_kami/features/home/widgets/category_card.dart';
 import 'package:mc_trainer_kami/features/home/widgets/quiz_card.dart';
 import 'package:mc_trainer_kami/provider/backend_provider.dart';
 import 'package:mc_trainer_kami/provider/home_provider.dart';
-import 'package:mc_trainer_kami/features/modules/screens/module_list_screen.dart';
 import '../../../main.dart';
 import 'package:mc_trainer_kami/features/home/screens/profile_screen.dart';
 import 'package:mc_trainer_kami/models/achievement_data.dart';
+import 'package:mc_trainer_kami/features/modules/screens/lesson_list_screen.dart';
+import 'package:mc_trainer_kami/models/module_data.dart';
 
 import 'notification_screen.dart';
 
@@ -49,10 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case 1: // Modules
         // Navigiere zum neuen Modul-Listen-Screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ModuleListScreen()),
-        );
+        Navigator.pushNamed(context, '/modules');
         // Setze den Index zurück auf Home nach der Navigation
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
@@ -90,11 +88,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final difference = now.difference(date);
 
     if (difference.inDays == 0) {
-      return 'Today';
+      return 'Heute';
     } else if (difference.inDays == 1) {
-      return 'Yesterday';
+      return 'Gestern';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
+      return 'vor ${difference.inDays} Tagen';
     } else {
       return '${date.day}.${date.month}.${date.year}';
     }
@@ -173,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome, ${backend.userName}!',
+            'Willkommen, ${backend.userName}!',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -192,22 +190,22 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildStatCard(
             icon: Icons.my_location_outlined,
             value: home.questionsThisWeek.toString(),
-            label: 'Questions this week',
+            label: 'Fragen diese Woche',
           ),
           _buildStatCard(
             icon: Icons.star_border_purple500_outlined,
-            value: '${backend.achievedPoint} Points',
-            label: 'Total Scored Points',
+            value: '${backend.achievedPoint} Punkte',
+            label: 'Gesammelte Punkte',
           ),
           _buildStatCard(
             icon: Icons.workspace_premium_outlined,
             value: '${home.submodulesCompleted} / ${home.submodulesTotal}',
-            label: 'Lessons completed',
+            label: 'Lektionen abgeschlossen',
           ),
           _buildStatCard(
             icon: Icons.directions_walk,
             value: home.currentStreak.toString(),
-            label: 'Current Streak',
+            label: 'Aktuelle Serie',
           ),
         ],
       ),
@@ -262,35 +260,40 @@ class _HomeScreenState extends State<HomeScreen> {
                             : Colors.grey[600],
                       ),
                     ),
-                    if (achievement.isUnlocked)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: achievement.color!.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${achievement.points} pts',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: achievement.color,
-                              ),
-                            ),
-                          ],
-                        ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
+                      decoration: BoxDecoration(
+                        color: achievement.isUnlocked
+                            ? achievement.color!.withOpacity(0.2)
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.star,
+                            size: 14,
+                            color: achievement.isUnlocked
+                                ? Colors.amber
+                                : Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${achievement.points} Punkte',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: achievement.isUnlocked
+                                  ? achievement.color
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -307,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      'Unlocked: ${_formatDate(achievement.unlockedDate!)}',
+                      'Freigeschaltet: ${_formatDate(achievement.unlockedDate!)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
@@ -319,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      'Not yet unlocked',
+                      'Noch nicht freigeschaltet',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -356,23 +359,55 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // Letzte Module anzeigen - mit dynamic Progress
-          ...backend.lastModules.map(
-            (module) => FutureBuilder<double>(
-              future: Provider.of<BackendProvider>(
-                context,
-                listen: false,
-              ).calculateModuleProgress(module.id ?? 0),
-              builder: (context, progressSnapshot) {
-                final progress = progressSnapshot.data ?? 0.0;
-                return QuizCard(
-                  moduleTitle: module.name,
-                  moduleDescription: module.description ?? '',
-                  progress: progress,
-                  onResume: () {},
-                );
-              },
-            ),
+          FutureBuilder<ResumeTarget?>(
+            future: Provider.of<BackendProvider>(context, listen: false)
+                .getResumeTarget(),
+            builder: (context, resumeSnapshot) {
+              if (resumeSnapshot.connectionState != ConnectionState.done) {
+                return const SizedBox.shrink();
+              }
+
+              final target = resumeSnapshot.data;
+              if (target == null) {
+                return const SizedBox.shrink();
+              }
+
+              return FutureBuilder<double>(
+                future: Provider.of<BackendProvider>(context, listen: false)
+                    .calculateSubmoduleProgress(target.submoduleId),
+                builder: (context, progressSnapshot) {
+                  final progress = progressSnapshot.data ?? 0.0;
+                  return QuizCard(
+                    title: target.submoduleTitle,
+                    subtitle: 'Modul: ${target.moduleTitle}',
+                    progress: progress,
+                    onResume: () {
+                      final module = Module(
+                        id: target.moduleId,
+                        title: target.moduleTitle,
+                        description: target.moduleDescription,
+                        totalLessons: 0,
+                        completedLessons: 0,
+                        progress: progress,
+                        iconColor: Colors.blue,
+                        icon: Icons.book,
+                      );
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LessonListScreen(
+                            module: module,
+                            resumeSubmoduleId: target.submoduleId,
+                            resumeAutoStart: true,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
           ),
           const SizedBox(height: 24),
           Padding(
@@ -390,17 +425,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           CategoryCard(
             icon: Icons.stacked_bar_chart,
-            title: 'Browse Modules',
-            subtitle: '${backend.lastModules.length} modules available',
+            title: 'Module durchsuchen',
+            subtitle: '${backend.lastModules.length} Module verfügbar',
             iconColor: Theme.of(context).colorScheme.primary,
             onTap: () {
               // Navigiere zum neuen Modul-Listen-Screen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ModuleListScreen(),
-                ),
-              );
+              Navigator.pushNamed(context, '/modules');
             },
           ),
 
@@ -410,9 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
               // Die eigentliche Achievements-Karte
               CategoryCard(
                 icon: Icons.emoji_events_outlined,
-                title: 'Achievements',
+                title: 'Erfolge',
                 subtitle:
-                    'View your badges and rewards ($unlockedCount/$totalCount)',
+                    'Abzeichen & Belohnungen ($unlockedCount/$totalCount)',
                 iconColor: Theme.of(context).colorScheme.secondary,
                 onTap: _toggleAchievementsDetails,
                 showArrow: false, // KEIN "Go" - stattdessen expand/collapse
@@ -458,8 +488,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // Statistics Karte (wird nach unten verschoben wenn Achievements geöffnet sind)
           CategoryCard(
             icon: Icons.trending_up,
-            title: 'Statistics',
-            subtitle: 'Track your progress',
+            title: 'Statistiken',
+            subtitle: 'Fortschritt verfolgen',
             iconColor: Colors.green.shade700,
             onTap: () {
               // Navigation zur Profilseite (wo die Statistiken sind)
@@ -473,14 +503,14 @@ class _HomeScreenState extends State<HomeScreen> {
           // NEU: Import Modules Karte hinzufügen
           const SizedBox(height: 12),
           CategoryCard(
-            icon: Icons.download,
-            title: 'Import Modules',
-            subtitle: 'Download new modules from server',
-            iconColor: Colors.purple,
-            onTap: () {
-              Navigator.pushNamed(context, '/import-modules');
-            },
-            showArrow: true,
+          icon: Icons.download,
+          title: 'Module importieren',
+          subtitle: 'Neue Module vom Server laden',
+          iconColor: Colors.purple,
+          onTap: () {
+          Navigator.pushNamed(context, '/import-modules');
+          },
+          showArrow: true,
           ),
           const SizedBox(height: 32),
         ],

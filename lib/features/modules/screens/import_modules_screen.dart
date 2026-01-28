@@ -17,6 +17,8 @@ class ImportModulesScreen extends StatefulWidget {
 class _ImportModulesScreenState extends State<ImportModulesScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<ImportableModule> _filteredModules = [];
+  bool _isSelectionMode = false;
+  final Set<int> _selectedModuleIds = {};
 
   @override
   void initState() {
@@ -103,6 +105,83 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
     }
   }
 
+  bool _isSelectable(ImportableModule module) {
+    return !module.isImported && !module.isDefault;
+  }
+
+  void _enterSelectionMode() {
+    setState(() {
+      _isSelectionMode = true;
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedModuleIds.clear();
+    });
+  }
+
+  void _toggleSelection(int moduleId) {
+    setState(() {
+      if (_selectedModuleIds.contains(moduleId)) {
+        _selectedModuleIds.remove(moduleId);
+        if (_selectedModuleIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedModuleIds.add(moduleId);
+      }
+    });
+  }
+
+  void _selectAllVisible() {
+    setState(() {
+      _selectedModuleIds
+        ..clear()
+        ..addAll(
+          _filteredModules
+              .where(_isSelectable)
+              .map((m) => m.id),
+        );
+      _isSelectionMode = _selectedModuleIds.isNotEmpty;
+    });
+  }
+
+  Future<void> _importSelectedModules(BackendProvider provider) async {
+    if (_selectedModuleIds.isEmpty) return;
+
+    final selectedModules = _filteredModules
+        .where((m) => _selectedModuleIds.contains(m.id))
+        .toList();
+
+    int successCount = 0;
+    for (final module in selectedModules) {
+      final success = await provider.importModule(module);
+      if (success) {
+        successCount++;
+      }
+    }
+
+    if (!mounted) return;
+
+    await provider.fetchImportableModules();
+    _filterModules();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$successCount von ${selectedModules.length} Modulen importiert',
+        ),
+        backgroundColor: successCount == selectedModules.length
+            ? Colors.green
+            : Colors.orange,
+      ),
+    );
+
+    _exitSelectionMode();
+  }
+
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -144,10 +223,11 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
   }
 
   Widget _buildImportableModuleCard(
-      BuildContext context,
-      ImportableModule module,
-      BackendProvider provider,
-      ) {
+    BuildContext context,
+    ImportableModule module,
+    BackendProvider provider,
+    bool isSelected,
+  ) {
     // Prüfe ob der Suchtext im Titel vorkommt
     final searchText = _searchController.text.toLowerCase();
     final moduleTitle = module.title.toLowerCase();
@@ -195,6 +275,8 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
       );
     }
 
+    final selectable = _isSelectable(module);
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       elevation: 2,
@@ -202,19 +284,58 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListTile(
+        onLongPress: selectable
+            ? () {
+                if (!_isSelectionMode) {
+                  _enterSelectionMode();
+                }
+                _toggleSelection(module.id);
+              }
+            : null,
+        onTap: () {
+          if (_isSelectionMode && selectable) {
+            _toggleSelection(module.id);
+          }
+        },
         contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: _parseColor(module.color),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            _getIcon(module.icon),
-            color: Colors.white,
-            size: 24,
-          ),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_isSelectionMode)
+              Container(
+                width: 24,
+                height: 24,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.blue : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? Colors.blue : Colors.grey.shade300,
+                    width: 2,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(
+                        Icons.check,
+                        size: 16,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: _parseColor(module.color),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _getIcon(module.icon),
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ],
         ),
         title: titleWidget,
         subtitle: Column(
@@ -281,64 +402,77 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
               ),
           ],
         ),
-        trailing: module.isImported
-            ? const Icon(Icons.check, color: Colors.green)
-            : module.isDefault
-            ? const Icon(Icons.check, color: Colors.blue)
-            : ElevatedButton(
-          onPressed: () async {
-            // WICHTIG: Setze loading state
-            setState(() {});
+        trailing: _isSelectionMode
+            ? Icon(
+                selectable
+                    ? (isSelected
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked)
+                    : Icons.lock,
+                color: selectable
+                    ? (isSelected ? Colors.blue : Colors.grey)
+                    : Colors.grey.shade400,
+              )
+            : module.isImported
+                ? const Icon(Icons.check, color: Colors.green)
+                : module.isDefault
+                    ? const Icon(Icons.check, color: Colors.blue)
+                    : ElevatedButton(
+                        onPressed: () async {
+                          // WICHTIG: Setze loading state
+                          setState(() {});
 
-            final success = await provider.importModule(module);
+                          final success = await provider.importModule(module);
 
-            if (success && mounted) {
-              // WICHTIG: Nach erfolgreichem Import, aktualisiere die Liste
-              await provider.fetchImportableModules();
+                          if (success && mounted) {
+                            // WICHTIG: Nach erfolgreichem Import, aktualisiere die Liste
+                            await provider.fetchImportableModules();
 
-              // Aktualisiere die gefilterte Liste
-              _filterModules();
+                            // Aktualisiere die gefilterte Liste
+                            _filterModules();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${module.title} wurde importiert!'),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            } else if (!success && mounted && provider.error != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(provider.error!),
-                  backgroundColor: Colors.red,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text('${module.title} wurde importiert!'),
+                                backgroundColor: Colors.green,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          } else if (!success && mounted &&
+                              provider.error != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(provider.error!),
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
 
-            // WICHTIG: Setze state zurück
-            if (mounted) {
-              setState(() {});
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryColorLight,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: provider.isLoading
-              ? const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
-            ),
-          )
-              : const Text('Importieren'),
-        ),
+                          // WICHTIG: Setze state zurück
+                          if (mounted) {
+                            setState(() {});
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryColorLight,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: provider.isLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Importieren'),
+                      ),
       ),
     );
   }
@@ -443,11 +577,34 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackgroundColor,
-      appBar: CustomAppBar(
-        title: 'Module Importieren',
-        subtitle: 'Lade neue Lernmodule von unserem Server',
-        showBackButton: true,
-      ),
+      appBar: _isSelectionMode
+          ? AppBar(
+              title: Text('${_selectedModuleIds.length} ausgewählt'),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectionMode,
+              ),
+              actions: [
+                if (_selectedModuleIds.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.download),
+                    onPressed: () {
+                      final provider =
+                          Provider.of<BackendProvider>(context, listen: false);
+                      _importSelectedModules(provider);
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.select_all),
+                  onPressed: _selectAllVisible,
+                ),
+              ],
+            )
+          : CustomAppBar(
+              title: 'Module Importieren',
+              subtitle: 'Lade neue Lernmodule von unserem Server',
+              showBackButton: true,
+            ),
       body: Consumer<BackendProvider>(
         builder: (context, provider, _) {
           // Initialisiere gefilterte Module
@@ -584,7 +741,12 @@ class _ImportModulesScreenState extends State<ImportModulesScreen> {
 
         // Module-Liste
         ..._filteredModules.map(
-              (module) => _buildImportableModuleCard(context, module, provider),
+          (module) => _buildImportableModuleCard(
+            context,
+            module,
+            provider,
+            _selectedModuleIds.contains(module.id),
+          ),
         ),
 
         // Info-Karte
