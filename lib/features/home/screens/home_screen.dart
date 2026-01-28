@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mc_trainer_kami/features/home/screens/statistics_screen.dart';
+import 'package:mc_trainer_kami/models/statistics.dart';
 import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/constants/app_strings.dart';
@@ -345,35 +347,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
-            child: Text(
-              AppStrings.continueLearning,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontSize: 20,
-              ),
-            ),
-          ),
-          // Letzte Module anzeigen - mit dynamic Progress
-          ...backend.lastModules.map(
-            (module) => FutureBuilder<double>(
-              future: Provider.of<BackendProvider>(
-                context,
-                listen: false,
-              ).calculateModuleProgress(module.id ?? 0),
-              builder: (context, progressSnapshot) {
-                final progress = progressSnapshot.data ?? 0.0;
-                return QuizCard(
-                  moduleTitle: module.name,
-                  moduleDescription: module.description ?? '',
-                  progress: progress,
-                  onResume: () {},
-                );
-              },
-            ),
-          ),
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.only(bottom: 12.0),
@@ -465,7 +438,11 @@ class _HomeScreenState extends State<HomeScreen> {
               // Navigation zur Profilseite (wo die Statistiken sind)
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                MaterialPageRoute(
+                  builder: (context) => StatisticsOverviewScreen(
+                    allStats: backend.userStatistics,
+                  ),
+                ),
               );
             },
             showArrow: true, // "Go" anzeigen
@@ -511,9 +488,6 @@ class _HomeScreenState extends State<HomeScreen> {
             }
             if (home.submodulesCompleted > 9) {
               backend.addAchievementWeekWarrior();
-            }
-            if (home.currentStreak > 0) {
-              backend.addAchievementFirstVisit();
             }
             if (backend.achievedPoint > 1499) {
               backend.addAchievementTopOfClass();
