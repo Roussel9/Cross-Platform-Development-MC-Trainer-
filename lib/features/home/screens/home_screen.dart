@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mc_trainer_kami/features/home/screens/statistics_screen.dart';
+import 'package:mc_trainer_kami/models/statistics.dart';
 import 'package:provider/provider.dart';
 import 'package:mc_trainer_kami/core/constants/app_colors.dart';
 import 'package:mc_trainer_kami/core/constants/app_strings.dart';
@@ -495,7 +497,11 @@ class _HomeScreenState extends State<HomeScreen> {
               // Navigation zur Profilseite (wo die Statistiken sind)
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                MaterialPageRoute(
+                  builder: (context) => StatisticsOverviewScreen(
+                    allStats: backend.userStatistics,
+                  ),
+                ),
               );
             },
             showArrow: true, // "Go" anzeigen
@@ -541,9 +547,6 @@ class _HomeScreenState extends State<HomeScreen> {
             }
             if (home.submodulesCompleted > 9) {
               backend.addAchievementWeekWarrior();
-            }
-            if (home.currentStreak > 0) {
-              backend.addAchievementFirstVisit();
             }
             if (backend.achievedPoint > 1499) {
               backend.addAchievementTopOfClass();

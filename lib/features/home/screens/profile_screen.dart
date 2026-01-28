@@ -88,8 +88,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     final provider = context.read<BackendProvider>();
-
-    // Prüfe ob Email geändert wurde
     final emailChanged = _emailController.text != provider.profileEmail;
 
     final success = await provider.updateProfile(
@@ -98,123 +96,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
       username: _usernameController.text,
     );
 
+    if (!mounted) return;
+
     setState(() {
       _isSaving = false;
       _isEditing = false;
     });
 
     if (success) {
-      if (emailChanged) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Email wurde SOFORT geändert auf: ${_emailController.text}',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Änderungen gespeichert'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } else {
+      final message = emailChanged
+          ? 'Email wurde SOFORT geändert auf: ${_emailController.text}'
+          : 'Änderungen gespeichert';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fehler beim Speichern'),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (provider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.error!),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  // Abmelde-Funktion mit Bestätigungsdialog
   Future<void> _showLogoutDialog() async {
-    return showDialog(
+    if (!mounted) return;
+    final shouldLogout = await showDialog<bool>(
       context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
+      barrierDismissible: false,
+      builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Abmelden'),
-          content: const Text('Möchten Sie sich wirklich abmelden?'),
-          actions: <Widget>[
+          title: const Text('Abmelden?'),
+          content: const Text('Möchtest du dich wirklich abmelden?'),
+          actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Dialog schließen
-              },
-              child: const Text(
-                'Abbrechen',
-                style: TextStyle(color: Colors.grey),
-              ),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Abbrechen'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Dialog schließen
-                _performLogout(); // Abmeldung durchführen
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Abmelden'),
             ),
           ],
         );
       },
     );
-  }
 
-  // Eigentliche Abmelde-Logik
-  void _performLogout() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Erfolgreich abgemeldet'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    // Navigiere direkt zur Login-Seite mit dem Route-Namen
-    Future.delayed(const Duration(milliseconds: 500), () {
-      Navigator.pushReplacementNamed(context, '/login');
-    });
-  }
-
-  Future<void> _selectProfileImage() async {
-    await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Profilbild auswählen'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('Aus Galerie auswählen'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('Foto aufnehmen'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    if (shouldLogout == true) {
+      await AuthService().signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -230,11 +166,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final backend = context.read<BackendProvider>();
 
         if (kIsWeb) {
-          // Für WEB: Wir lesen die Bytes aus dem XFile
+          
           final Uint8List imageBytes = await pickedFile.readAsBytes();
           await backend.uploadAvatar(imageBytes);
         } else {
-          // Für MOBILE: Wir übergeben das File Objekt
+          
           await backend.uploadAvatar(File(pickedFile.path));
         }
 
@@ -342,16 +278,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader(BackendProvider provider, bool isSmallScreen) {
-    // Entscheiden, welches Bild angezeigt wird:
-    // 1. Priorität: Das gerade lokal ausgewählte File (noch im Upload)
-    // 2. Priorität: Die URL aus Supabase
-    BackendProvider backend = provider;
+    final backend = provider;
     ImageProvider? imageProvider;
     if (backend.selectedImageFile != null) {
       imageProvider = FileImage(backend.selectedImageFile!);
     } else if (backend.avatarUrl != null) {
       imageProvider = NetworkImage(backend.avatarUrl!);
     }
+
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
       decoration: BoxDecoration(
@@ -360,98 +294,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Profilbild mit Bearbeitungs-Icon (STIFT HINZUFÜGEN)
-          GestureDetector(
-            onTap: _selectProfileImage,
-            child: Stack(
-              children: [
-                Container(
-                  width: isSmallScreen ? 60 : 80,
-                  height: isSmallScreen ? 60 : 80,
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: isSmallScreen ? 28 : 36,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundImage: imageProvider,
+                child: imageProvider == null
+                    ? Icon(
+                        Icons.person,
+                        size: isSmallScreen ? 30 : 40,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
                   decoration: BoxDecoration(
+                    color: AppColors.primaryColorLight,
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.2),
                     border: Border.all(
                       color: Colors.white,
-                      width: isSmallScreen ? 2 : 3,
+                      width: isSmallScreen ? 1.5 : 2,
                     ),
-                    image: imageProvider != null
-                        ? DecorationImage(
-                            image: imageProvider,
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
-                  child: imageProvider == null
-                      ? Icon(
-                          Icons.person,
-                          size: isSmallScreen ? 30 : 40,
-                          color: Colors.white,
-                        )
-                      : null,
+                  child: Icon(
+                    Icons.edit,
+                    size: isSmallScreen ? 14 : 18,
+                    color: Colors.white,
+                  ),
                 ),
-                // Stift-Icon hinzufügen
+              ),
+              if (backend.avatarUrl != null ||
+                  backend.selectedImageFile != null)
                 Positioned(
-                  bottom: 0,
+                  top: 0,
                   right: 0,
-                  child: Container(
-                    padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColorLight,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: isSmallScreen ? 1.5 : 2,
+                  child: GestureDetector(
+                    onTap: _deleteProfileImage,
+                    child: Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
-                    ),
-                    child: Icon(
-                      Icons.edit,
-                      size: isSmallScreen ? 14 : 18,
-                      color: Colors.white,
+                      child: Icon(
+                        Icons.close,
+                        size: isSmallScreen ? 12 : 16,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-                // Delete Button erscheint nur, wenn ein Bild existiert
-                if (backend.avatarUrl != null ||
-                    backend.selectedImageFile != null)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _deleteProfileImage,
-                      child: Container(
-                        padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          size: isSmallScreen ? 12 : 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ),
           SizedBox(width: isSmallScreen ? 12 : 20),
-
-          // Profilinformationen
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name
                 Text(
                   provider.profileName.isNotEmpty
                       ? provider.profileName
@@ -464,9 +376,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 SizedBox(height: isSmallScreen ? 2 : 4),
-
                 Text(
                   provider.profileEmail,
                   style: TextStyle(
@@ -476,8 +386,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
-                // Mitglied seit Datum
                 SizedBox(height: isSmallScreen ? 4 : 8),
                 Text(
                   provider.profileCreatedAt.isNotEmpty
@@ -488,7 +396,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Colors.white.withOpacity(0.8),
                   ),
                 ),
-
                 if (provider.profileUsername.isNotEmpty) ...[
                   SizedBox(height: isSmallScreen ? 4 : 8),
                   Text(
@@ -499,7 +406,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ],
-
                 SizedBox(height: isSmallScreen ? 8 : 16),
               ],
             ),
