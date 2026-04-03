@@ -249,6 +249,26 @@ Weitere optionale oder nicht explizit vorgegebene Punkte, die im Projekt vorkomm
   Supabase-Zugangsdaten aus `.env` laden und in `main.dart` bei `Supabase.initialize()` verwenden, sobald `flutter_dotenv` dort angebunden ist – dann sind keine Zugangsdaten im Quellcode nötig.
 
 Mit diesem Stand der Dokumentation können sich neue Entwickler schnell im Projekt orientieren und die Entwicklungsumgebung so einrichten, dass sie mit dem Lesen der README direkt mit der Entwicklung starten können.
+
+## 📱 Einige Screenshots
+
+
+![](assets/images/bild1.png)
+![](assets/images/bild2.png)
+
+![](assets/images/bild3.png)
+
+
+![](assets/images/bild4.png)
+
+
+![](assets/images/bild5.png)
+
+
+![](assets/images/bild6.png)
+
+![](assets/images/bild7.png)
+
 ## 👥 Autoren
 
 Entwickelt von:
