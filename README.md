@@ -1,8 +1,8 @@
-# MC Trainer Kami – Projektdokumentation
+# MC Trainer – Projektdokumentation
 
 ## 1. Einleitung
 
-**MC Trainer Kami** ist ein universeller Multiple-Choice-Trainer für mobile Geräte. Die Anwendung ermöglicht es Nutzerinnen und Nutzern, Lernkarten („Karten“) in Modulen zu bearbeiten, Fortschritte zu verfolgen und Abzeichen (Achievements) zu sammeln.
+**MC Trainer** ist ein universeller Multiple-Choice-Trainer für mobile Geräte. Die Anwendung ermöglicht es Nutzerinnen und Nutzern, Lernkarten („Karten“) in Modulen zu bearbeiten, Fortschritte zu verfolgen und Abzeichen (Achievements) zu sammeln.
 
 ### Was kann mit der Software gemacht werden?
 
